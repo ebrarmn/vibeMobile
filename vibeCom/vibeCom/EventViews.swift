@@ -217,55 +217,179 @@ struct CategoryButton: View {
     }
 }
 
+struct EventDetailView: View {
+    @ObservedObject var theme = Theme.shared
+    let event: Event
+    @State private var isAnimating = false
+    
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 20) {
+                // Etkinlik Görseli
+                AsyncImage(url: URL(string: event.imageURL)) { image in
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                } placeholder: {
+                    Color.gray.opacity(0.3)
+                        .overlay(
+                            Image(systemName: "photo")
+                                .font(.largeTitle)
+                                .foregroundColor(.white)
+                        )
+                }
+                .frame(height: 250)
+                .clipped()
+                
+                VStack(alignment: .leading, spacing: 20) {
+                    // Başlık ve Kategori
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(event.title)
+                            .font(.title)
+                            .fontWeight(.bold)
+                        
+                        HStack {
+                            Image(systemName: event.category.icon)
+                            Text(event.category.rawValue)
+                        }
+                        .foregroundColor(theme.primaryColor)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(theme.primaryColor.opacity(0.1))
+                        .cornerRadius(20)
+                    }
+                    
+                    // Tarih ve Konum
+                    VStack(spacing: 12) {
+                        HStack {
+                            Image(systemName: "calendar")
+                                .foregroundColor(theme.primaryColor)
+                            Text(event.date.formatted(date: .long, time: .shortened))
+                            Spacer()
+                        }
+                        
+                        HStack {
+                            Image(systemName: "mappin.and.ellipse")
+                                .foregroundColor(theme.primaryColor)
+                            Text(event.location)
+                            Spacer()
+                        }
+                    }
+                    .padding()
+                    .background(theme.cardBackgroundColor)
+                    .cornerRadius(15)
+                    
+                    // Açıklama
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Etkinlik Hakkında")
+                            .font(.title2)
+                            .fontWeight(.bold)
+                        
+                        Text(event.description)
+                            .foregroundColor(theme.secondaryTextColor)
+                    }
+                    
+                    // Katılımcılar
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Katılımcılar")
+                            .font(.title2)
+                            .fontWeight(.bold)
+                        
+                        HStack {
+                            ForEach(event.attendees.prefix(5), id: \.self) { attendee in
+                                Circle()
+                                    .fill(theme.primaryColor.opacity(0.2))
+                                    .frame(width: 40, height: 40)
+                                    .overlay(
+                                        Text(String(attendee.prefix(1)))
+                                            .foregroundColor(theme.primaryColor)
+                                    )
+                            }
+                            
+                            if event.attendees.count > 5 {
+                                Text("+\(event.attendees.count - 5)")
+                                    .foregroundColor(theme.secondaryTextColor)
+                            }
+                        }
+                    }
+                    
+                    // Katıl Butonu
+                    Button(action: {
+                        // TODO: Katılma işlemi
+                    }) {
+                        Text("Etkinliğe Katıl")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(theme.primaryColor)
+                            .cornerRadius(15)
+                    }
+                }
+                .padding()
+            }
+        }
+        .background(theme.backgroundColor)
+        .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            withAnimation {
+                isAnimating = true
+            }
+        }
+    }
+}
+
 struct FeaturedEventView: View {
     let event: Event
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            AsyncImage(url: URL(string: event.imageURL)) { image in
-                image
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-            } placeholder: {
-                Color.gray.opacity(0.3)
-                    .overlay(
-                        Image(systemName: "photo")
-                            .font(.largeTitle)
-                            .foregroundColor(.white)
-                    )
-            }
-            .frame(height: 200)
-            .clipped()
-            
-            VStack(alignment: .leading, spacing: 8) {
-                Text("ÖNE ÇIKAN ETKİNLİK")
-                    .font(.caption)
-                    .fontWeight(.bold)
-                    .foregroundColor(.blue)
-                
-                Text(event.title)
-                    .font(.title2)
-                    .fontWeight(.bold)
-                
-                Text(event.description)
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                    .lineLimit(2)
-                
-                HStack {
-                    Label(event.date.formatted(date: .abbreviated, time: .shortened),
-                          systemImage: "calendar")
-                    Spacer()
-                    Label(event.location, systemImage: "mappin.and.ellipse")
+        NavigationLink(destination: EventDetailView(event: event)) {
+            VStack(alignment: .leading, spacing: 0) {
+                AsyncImage(url: URL(string: event.imageURL)) { image in
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                } placeholder: {
+                    Color.gray.opacity(0.3)
+                        .overlay(
+                            Image(systemName: "photo")
+                                .font(.largeTitle)
+                                .foregroundColor(.white)
+                        )
                 }
-                .font(.caption)
-                .foregroundColor(.secondary)
+                .frame(height: 200)
+                .clipped()
+                
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("ÖNE ÇIKAN ETKİNLİK")
+                        .font(.caption)
+                        .fontWeight(.bold)
+                        .foregroundColor(.blue)
+                    
+                    Text(event.title)
+                        .font(.title2)
+                        .fontWeight(.bold)
+                    
+                    Text(event.description)
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .lineLimit(2)
+                    
+                    HStack {
+                        Label(event.date.formatted(date: .abbreviated, time: .shortened),
+                              systemImage: "calendar")
+                        Spacer()
+                        Label(event.location, systemImage: "mappin.and.ellipse")
+                    }
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                }
+                .padding()
             }
-            .padding()
+            .background(Color(.systemBackground))
+            .cornerRadius(15)
+            .shadow(radius: 5)
         }
-        .background(Color(.systemBackground))
-        .cornerRadius(15)
-        .shadow(radius: 5)
     }
 }
 
@@ -273,31 +397,43 @@ struct WeeklyEventCard: View {
     let event: Event
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            AsyncImage(url: URL(string: event.imageURL)) { image in
-                image
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-            } placeholder: {
-                Color.gray.opacity(0.3)
-                    .overlay(
-                        Image(systemName: "photo")
-                            .foregroundColor(.white)
-                    )
+        NavigationLink(destination: EventDetailView(event: event)) {
+            VStack(alignment: .leading, spacing: 8) {
+                AsyncImage(url: URL(string: event.imageURL)) { image in
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                } placeholder: {
+                    Color.gray.opacity(0.3)
+                        .overlay(
+                            Image(systemName: "photo")
+                                .foregroundColor(.white)
+                        )
+                }
+                .frame(width: 200, height: 120)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(event.title)
+                        .font(.headline)
+                        .lineLimit(1)
+                    
+                    Text(event.date.formatted(date: .abbreviated, time: .shortened))
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    
+                    Text(event.location)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                }
+                .padding(.horizontal, 8)
             }
-            .frame(width: 200, height: 120)
-            .clipped()
-            .cornerRadius(10)
-            
-            Text(event.title)
-                .font(.headline)
-                .lineLimit(1)
-            
-            Text(event.date.formatted(date: .abbreviated, time: .shortened))
-                .font(.caption)
-                .foregroundColor(.secondary)
+            .frame(width: 200)
+            .background(Color(.systemBackground))
+            .cornerRadius(15)
+            .shadow(radius: 3)
         }
-        .frame(width: 200)
     }
 }
 
@@ -305,44 +441,46 @@ struct EventCard: View {
     let event: Event
     
     var body: some View {
-        HStack(spacing: 15) {
-            AsyncImage(url: URL(string: event.imageURL)) { image in
-                image
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-            } placeholder: {
-                Color.gray.opacity(0.3)
-                    .overlay(
-                        Image(systemName: "photo")
-                            .foregroundColor(.white)
-                    )
-            }
-            .frame(width: 80, height: 80)
-            .clipShape(RoundedRectangle(cornerRadius: 10))
-            
-            VStack(alignment: .leading, spacing: 4) {
-                Text(event.title)
-                    .font(.headline)
-                
-                Text(event.description)
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                    .lineLimit(2)
-                
-                HStack {
-                    Label(event.date.formatted(date: .abbreviated, time: .shortened),
-                          systemImage: "calendar")
-                    Spacer()
-                    Label("\(event.attendees.count)", systemImage: "person.2")
+        NavigationLink(destination: EventDetailView(event: event)) {
+            HStack(spacing: 15) {
+                AsyncImage(url: URL(string: event.imageURL)) { image in
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                } placeholder: {
+                    Color.gray.opacity(0.3)
+                        .overlay(
+                            Image(systemName: "photo")
+                                .foregroundColor(.white)
+                        )
                 }
-                .font(.caption)
-                .foregroundColor(.secondary)
+                .frame(width: 80, height: 80)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(event.title)
+                        .font(.headline)
+                    
+                    Text(event.description)
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .lineLimit(2)
+                    
+                    HStack {
+                        Label(event.date.formatted(date: .abbreviated, time: .shortened),
+                              systemImage: "calendar")
+                        Spacer()
+                        Label("\(event.attendees.count)", systemImage: "person.2")
+                    }
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                }
             }
+            .padding()
+            .background(Color(.systemBackground))
+            .cornerRadius(15)
+            .shadow(radius: 3)
         }
-        .padding()
-        .background(Color(.systemBackground))
-        .cornerRadius(15)
-        .shadow(radius: 3)
     }
 }
 
