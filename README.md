@@ -1,113 +1,51 @@
-# Üniversite Kulüpleri Yönetim Platformu 🎓
+# 📱 VIBE - Virtual Interactive Belonging Engagement (Mobile)
 
-Bu platform, üniversite kulüplerinin etkinlik yönetimini dijitalleştirmek, üyelerle iletişimi artırmak ve tüm organizasyon süreçlerini tek bir platformda toplamak amacıyla geliştirilmiştir.
+> Üniversite kulüpleri için etkinlik yönetimi, iletişim ve organizasyon süreçlerini dijitalleştiren iOS uygulaması.
 
-## 🚀 Özellikler
+---
 
-- Kulüp yönetimi ve üyelik sistemi
-- Etkinlik oluşturma ve yönetimi
-- Duyuru paylaşımı
-- Mesajlaşma sistemi
-- Kullanıcı profil yönetimi
-- Etkinlik katılım takibi
+## 🚀 Proje Hakkında
 
-## 🛠 Teknolojiler
+VIBE, üniversite kulüplerinin etkinliklerini yönetmelerine ve üyeleriyle daha etkili bir şekilde iletişim kurmalarına yardımcı olmak için geliştirilen bir mobil platformdur.  
+Yapay zeka destekli öneri sistemleri ve kullanıcı dostu tasarımıyla kulüp faaliyetlerini bir araya toplar.
 
-### Web Uygulaması
-- Frontend: React.js
-- Backend: Node.js, Express.js
-- Veritabanı: PostgreSQL
+---
 
-### Mobil Uygulama
-- React Native
-- Expo
+## 🎯 Proje Amacı
 
-## 💻 Kurulum
+- Üniversite kulüplerinin etkinlik süreçlerini dijitalleştirmek
+- Kulüplerle üyeler arasında etkili bir iletişim köprüsü kurmak
+- Kullanıcıya özel etkinlik ve kulüp önerileri sunmak
+- Etkinlik duyuruları, mesajlaşma ve organizasyon işlemlerini tek bir platformda toplamak
 
-### Ön Gereksinimler
-- Node.js (v22.14.0 veya üzeri)
-- PostgreSQL
-- npm veya yarn
+---
 
-### Backend Kurulumu
-```bash
-cd web/server
-npm install
-# .env dosyasını oluşturun ve gerekli değişkenleri ayarlayın
-npm start
-```
+## 🛠️ Kullanılan Teknolojiler
 
-### Frontend Kurulumu
-```bash
-cd web/client
-npm install
-# .env dosyasını oluşturun ve gerekli değişkenleri ayarlayın
-npm start
-```
+| Teknoloji        | Açıklama                                  |
+|------------------|-------------------------------------------|
+| **SwiftUI**      | Modern, komponent tabanlı iOS arayüz geliştirme |
+| **Firebase**     | Gerçek zamanlı veritabanı ve kimlik doğrulama |
+| **JWT**          | Güvenli oturum yönetimi ve rol bazlı erişim |
 
-### Mobil Uygulama Kurulumu
-```bash
-cd mobile
-npm install
-npm start
-```
+---
 
-## 🌐 Ortam Değişkenleri
+## 📅 Geliştirme Takvimi
 
-### Backend (.env)
-```
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=university_clubs
-DB_USER=postgres
-DB_PASSWORD=your_password
-PORT=5001
-JWT_SECRET=your_jwt_secret
-```
+| Hafta | İş Paketi  |
+|------|------------|
+| 1-2  | Gereksinimlerin Belirlenmesi, Wireframe Tasarımları |
+| 3-4  | Ana Sayfa, Kulüp Listesi ve Etkinlikler Ekranları (SwiftUI) |
+| 5-6  | Profil ve Ayarlar Sayfalarının Geliştirilmesi |
+| 7-8  | Kulüp ve Etkinlik Takip Fonksiyonlarının Eklenmesi |
+| 9-10 | Firebase Authentication, Giriş/Kayıt Ekranları |
+| 11-12| Veritabanı Bağlantısı, İç Testler |
+| 13-14| Hata Düzeltmeleri ve Final Teslim |
 
-### Frontend (.env)
-```
-REACT_APP_API_URL=http://localhost:5001/api
-```
+---
 
-## 📱 Portlar
+## ⚙️ Kurulum (Nasıl Çalıştırılır?)
 
-- Backend: 5001
-- Frontend: 3000 (veya 3005)
-- Mobil Expo: 19000
-
-## 👥 Kullanım
-
-1. Sisteme kayıt olun veya giriş yapın
-2. Kulüpleri keşfedin ve üye olun
-3. Etkinliklere katılın
-4. Duyuruları takip edin
-5. Diğer üyelerle iletişime geçin
-
-## 🔒 Güvenlik
-
-- JWT tabanlı kimlik doğrulama
-- Şifrelenmiş kullanıcı bilgileri
-- Rol tabanlı yetkilendirme sistemi
-
-## 🤝 Katkıda Bulunma
-
-1. Bu repository'yi fork edin
-2. Feature branch'i oluşturun (`git checkout -b feature/AmazingFeature`)
-3. Değişikliklerinizi commit edin (`git commit -m 'Add some AmazingFeature'`)
-4. Branch'inizi push edin (`git push origin feature/AmazingFeature`)
-5. Pull Request oluşturun
-
-## 📝 Lisans
-
-Bu proje MIT lisansı altında lisanslanmıştır. Daha fazla bilgi için `LICENSE` dosyasına bakın.
-
-## 📞 İletişim
-
-Ebrar Mangan - [@ebrarmn](https://github.com/ebrarmn)
-
-<<<<<<< HEAD
-Proje Linki: [https://github.com/ebrarmn/VibeWebV.1.0](https://github.com/ebrarmn/vibeMobile) 
-=======
-Proje Linki: [https://github.com/ebrarmn/VibeWebV.1.0](https://github.com/ebrarmn/vibeMobile)
->>>>>>> bb7b02ba90ac627ce7aafa46eaab6a2fd69c4525
+1. Bu repoyu klonlayın:
+   ```bash
+   git clone https://github.com/kullaniciadi/vibe-mobile.git
