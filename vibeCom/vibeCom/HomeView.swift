@@ -85,7 +85,7 @@ struct MainView: View {
         featuredEvents = [
             Event(id: "1", title: "Swift Workshop", description: "iOS uygulama geliştirme workshop'u", date: Date(), location: "A Blok Lab 1", clubId: "1", imageURL: "https://example.com/event1.jpg", attendees: ["user1", "user2"], category: .technology),
             Event(id: "2", title: "Startup Weekend", description: "48 saat sürecek girişimcilik etkinliği", date: Date().addingTimeInterval(86400), location: "Konferans Salonu", clubId: "2", imageURL: "https://example.com/event2.jpg", attendees: ["user3"], category: .business),
-            Event(id: "3", title: "Rock Konseri", description: "Kampüs rock grubu konseri", date: Date().addingTimeInterval(172800), location: "Amfi Tiyatro", clubId: "3", imageURL: "https://example.com/event3.jpg", attendees: ["user1", "user4", "user5"], category: .music)
+            Event(id: "3", title: "Basketbol Turnuvası", description: "Kampüs basketbol turnuvası", date: Date().addingTimeInterval(172800), location: "Çok amaçlı salon", clubId: "3", imageURL: "https://example.com/event3.jpg", attendees: ["user1", "user4", "user5"], category: .music)
         ]
         
         // Örnek kulüp verileri

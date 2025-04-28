@@ -221,6 +221,7 @@ struct EventDetailView: View {
     @ObservedObject var theme = Theme.shared
     let event: Event
     @State private var isAnimating = false
+    @ObservedObject private var userSession = UserSession.shared
     
     var body: some View {
         ScrollView {
@@ -295,34 +296,41 @@ struct EventDetailView: View {
                             .font(.title2)
                             .fontWeight(.bold)
                         
-                        HStack {
-                            ForEach(event.attendees.prefix(5), id: \.self) { attendee in
-                                Circle()
-                                    .fill(theme.primaryColor.opacity(0.2))
-                                    .frame(width: 40, height: 40)
-                                    .overlay(
-                                        Text(String(attendee.prefix(1)))
-                                            .foregroundColor(theme.primaryColor)
-                                    )
-                            }
-                            
-                            if event.attendees.count > 5 {
-                                Text("+\(event.attendees.count - 5)")
-                                    .foregroundColor(theme.secondaryTextColor)
-                            }
+                        
+                        let allAttendees = Array(Set(event.attendees + (userSession.attendingEvents.contains(event.id) ? [userSession.userId] : [])))
+                        ForEach(allAttendees.prefix(5), id: \.self) { attendee in
+                            Circle()
+                                .fill(theme.primaryColor.opacity(0.2))
+                                .frame(width: 40, height: 40)
+                                .overlay(
+                                    Text(String(attendee.prefix(1)))
+                                        .foregroundColor(theme.primaryColor)
+                                )
+                        }
+                        
+                        let attendeeCount = allAttendees.count
+                        if attendeeCount > 5 {
+                            Text("+\(attendeeCount - 5)")
+                                .foregroundColor(theme.secondaryTextColor)
                         }
                     }
                     
                     // Katıl Butonu
                     Button(action: {
-                        // TODO: Katılma işlemi
+                        withAnimation {
+                            if userSession.attendingEvents.contains(event.id) {
+                                userSession.leaveEvent(event.id)
+                            } else {
+                                userSession.attendEvent(event.id)
+                            }
+                        }
                     }) {
-                        Text("Etkinliğe Katıl")
+                        Text(userSession.attendingEvents.contains(event.id) ? "Etkinlikten Ayrıl" : "Etkinliğe Katıl")
                             .font(.headline)
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
                             .padding()
-                            .background(theme.primaryColor)
+                            .background(userSession.attendingEvents.contains(event.id) ? Color.red : theme.primaryColor)
                             .cornerRadius(15)
                     }
                 }
@@ -344,51 +352,51 @@ struct FeaturedEventView: View {
     
     var body: some View {
         NavigationLink(destination: EventDetailView(event: event)) {
-            VStack(alignment: .leading, spacing: 0) {
-                AsyncImage(url: URL(string: event.imageURL)) { image in
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                } placeholder: {
-                    Color.gray.opacity(0.3)
-                        .overlay(
-                            Image(systemName: "photo")
-                                .font(.largeTitle)
-                                .foregroundColor(.white)
-                        )
-                }
-                .frame(height: 200)
-                .clipped()
-                
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("ÖNE ÇIKAN ETKİNLİK")
-                        .font(.caption)
-                        .fontWeight(.bold)
-                        .foregroundColor(.blue)
-                    
-                    Text(event.title)
-                        .font(.title2)
-                        .fontWeight(.bold)
-                    
-                    Text(event.description)
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                        .lineLimit(2)
-                    
-                    HStack {
-                        Label(event.date.formatted(date: .abbreviated, time: .shortened),
-                              systemImage: "calendar")
-                        Spacer()
-                        Label(event.location, systemImage: "mappin.and.ellipse")
-                    }
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                }
-                .padding()
+        VStack(alignment: .leading, spacing: 0) {
+            AsyncImage(url: URL(string: event.imageURL)) { image in
+                image
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+            } placeholder: {
+                Color.gray.opacity(0.3)
+                    .overlay(
+                        Image(systemName: "photo")
+                            .font(.largeTitle)
+                            .foregroundColor(.white)
+                    )
             }
-            .background(Color(.systemBackground))
-            .cornerRadius(15)
-            .shadow(radius: 5)
+            .frame(height: 200)
+            .clipped()
+            
+            VStack(alignment: .leading, spacing: 8) {
+                Text("ÖNE ÇIKAN ETKİNLİK")
+                    .font(.caption)
+                    .fontWeight(.bold)
+                    .foregroundColor(.blue)
+                
+                Text(event.title)
+                    .font(.title2)
+                    .fontWeight(.bold)
+                
+                Text(event.description)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .lineLimit(2)
+                
+                HStack {
+                    Label(event.date.formatted(date: .abbreviated, time: .shortened),
+                          systemImage: "calendar")
+                    Spacer()
+                    Label(event.location, systemImage: "mappin.and.ellipse")
+                }
+                .font(.caption)
+                .foregroundColor(.secondary)
+            }
+            .padding()
+        }
+        .background(Color(.systemBackground))
+        .cornerRadius(15)
+        .shadow(radius: 5)
         }
     }
 }
@@ -398,29 +406,29 @@ struct WeeklyEventCard: View {
     
     var body: some View {
         NavigationLink(destination: EventDetailView(event: event)) {
-            VStack(alignment: .leading, spacing: 8) {
-                AsyncImage(url: URL(string: event.imageURL)) { image in
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                } placeholder: {
-                    Color.gray.opacity(0.3)
-                        .overlay(
-                            Image(systemName: "photo")
-                                .foregroundColor(.white)
-                        )
-                }
-                .frame(width: 200, height: 120)
+        VStack(alignment: .leading, spacing: 8) {
+            AsyncImage(url: URL(string: event.imageURL)) { image in
+                image
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+            } placeholder: {
+                Color.gray.opacity(0.3)
+                    .overlay(
+                        Image(systemName: "photo")
+                            .foregroundColor(.white)
+                    )
+            }
+            .frame(width: 200, height: 120)
                 .clipShape(RoundedRectangle(cornerRadius: 10))
-                
+            
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(event.title)
-                        .font(.headline)
-                        .lineLimit(1)
-                    
-                    Text(event.date.formatted(date: .abbreviated, time: .shortened))
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+            Text(event.title)
+                .font(.headline)
+                .lineLimit(1)
+            
+            Text(event.date.formatted(date: .abbreviated, time: .shortened))
+                .font(.caption)
+                .foregroundColor(.secondary)
                     
                     Text(event.location)
                         .font(.caption)
@@ -428,8 +436,8 @@ struct WeeklyEventCard: View {
                         .lineLimit(1)
                 }
                 .padding(.horizontal, 8)
-            }
-            .frame(width: 200)
+        }
+        .frame(width: 200)
             .background(Color(.systemBackground))
             .cornerRadius(15)
             .shadow(radius: 3)
@@ -442,44 +450,44 @@ struct EventCard: View {
     
     var body: some View {
         NavigationLink(destination: EventDetailView(event: event)) {
-            HStack(spacing: 15) {
-                AsyncImage(url: URL(string: event.imageURL)) { image in
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                } placeholder: {
-                    Color.gray.opacity(0.3)
-                        .overlay(
-                            Image(systemName: "photo")
-                                .foregroundColor(.white)
-                        )
-                }
-                .frame(width: 80, height: 80)
-                .clipShape(RoundedRectangle(cornerRadius: 10))
-                
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(event.title)
-                        .font(.headline)
-                    
-                    Text(event.description)
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                        .lineLimit(2)
-                    
-                    HStack {
-                        Label(event.date.formatted(date: .abbreviated, time: .shortened),
-                              systemImage: "calendar")
-                        Spacer()
-                        Label("\(event.attendees.count)", systemImage: "person.2")
-                    }
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                }
+        HStack(spacing: 15) {
+            AsyncImage(url: URL(string: event.imageURL)) { image in
+                image
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+            } placeholder: {
+                Color.gray.opacity(0.3)
+                    .overlay(
+                        Image(systemName: "photo")
+                            .foregroundColor(.white)
+                    )
             }
-            .padding()
-            .background(Color(.systemBackground))
-            .cornerRadius(15)
-            .shadow(radius: 3)
+            .frame(width: 80, height: 80)
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text(event.title)
+                    .font(.headline)
+                
+                Text(event.description)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .lineLimit(2)
+                
+                HStack {
+                    Label(event.date.formatted(date: .abbreviated, time: .shortened),
+                          systemImage: "calendar")
+                    Spacer()
+                    Label("\(event.attendees.count)", systemImage: "person.2")
+                }
+                .font(.caption)
+                .foregroundColor(.secondary)
+            }
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(15)
+        .shadow(radius: 3)
         }
     }
 }

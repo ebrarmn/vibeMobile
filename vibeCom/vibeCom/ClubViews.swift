@@ -59,70 +59,70 @@ struct ClubListView: View {
                     // Öne çıkan kulüp
                     if let featuredClub = clubs.first {
                         NavigationLink(destination: ClubDetailView(club: featuredClub)) {
-                            VStack(alignment: .leading, spacing: 0) {
-                                AsyncImage(url: URL(string: featuredClub.logoURL)) { image in
-                                    image
-                                        .resizable()
-                                        .aspectRatio(contentMode: .fill)
-                                } placeholder: {
-                                    Color.gray.opacity(0.3)
-                                        .overlay(
-                                            Image(systemName: "building.2")
-                                                .font(.largeTitle)
-                                                .foregroundColor(.white)
-                                        )
-                                }
-                                .frame(height: 200)
-                                .clipped()
-                                
-                                VStack(alignment: .leading, spacing: 8) {
-                                    Text("ÖNE ÇIKAN KULÜP")
-                                        .font(.caption)
-                                        .fontWeight(.bold)
-                                        .foregroundStyle(
-                                            LinearGradient(
-                                                colors: [theme.primaryColor, theme.primaryColor.opacity(0.7)],
-                                                startPoint: .leading,
-                                                endPoint: .trailing
-                                            )
-                                        )
-                                    
-                                    Text(featuredClub.name)
-                                        .font(.title2)
-                                        .fontWeight(.bold)
-                                    
-                                    Text(featuredClub.description)
-                                        .font(.subheadline)
-                                        .foregroundColor(.secondary)
-                                        .lineLimit(2)
-                                    
-                                    HStack {
-                                        Label("\(featuredClub.members.count) Üye", systemImage: "person.3")
-                                        Spacer()
-                                        Label("\(featuredClub.events.count) Etkinlik", systemImage: "calendar")
-                                    }
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                }
-                                .padding()
+                        VStack(alignment: .leading, spacing: 0) {
+                            AsyncImage(url: URL(string: featuredClub.logoURL)) { image in
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                            } placeholder: {
+                                Color.gray.opacity(0.3)
+                                    .overlay(
+                                        Image(systemName: "building.2")
+                                            .font(.largeTitle)
+                                            .foregroundColor(.white)
+                                    )
                             }
-                            .background(
-                                LinearGradient(
-                                    colors: [theme.cardBackgroundColor, theme.cardBackgroundColor.opacity(0.8)],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
+                            .frame(height: 200)
+                            .clipped()
+                            
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("ÖNE ÇIKAN KULÜP")
+                                    .font(.caption)
+                                    .fontWeight(.bold)
+                                    .foregroundStyle(
+                                        LinearGradient(
+                                            colors: [theme.primaryColor, theme.primaryColor.opacity(0.7)],
+                                            startPoint: .leading,
+                                            endPoint: .trailing
+                                        )
+                                    )
+                                
+                                Text(featuredClub.name)
+                                    .font(.title2)
+                                    .fontWeight(.bold)
+                                
+                                Text(featuredClub.description)
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                                    .lineLimit(2)
+                                
+                                HStack {
+                                    Label("\(featuredClub.members.count) Üye", systemImage: "person.3")
+                                    Spacer()
+                                    Label("\(featuredClub.events.count) Etkinlik", systemImage: "calendar")
+                                }
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            }
+                            .padding()
+                        }
+                        .background(
+                            LinearGradient(
+                                colors: [theme.cardBackgroundColor, theme.cardBackgroundColor.opacity(0.8)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
                             )
-                            .cornerRadius(15)
-                            .shadow(radius: 5)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 15)
-                                    .stroke(theme.primaryColor.opacity(0.3), lineWidth: 1)
-                            )
-                            .padding(.horizontal)
-                            .scaleEffect(isAnimating ? 1.0 : 0.95)
-                            .opacity(isAnimating ? 1.0 : 0.0)
-                            .animation(.easeInOut(duration: 0.5), value: isAnimating)
+                        )
+                        .cornerRadius(15)
+                        .shadow(radius: 5)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 15)
+                                .stroke(theme.primaryColor.opacity(0.3), lineWidth: 1)
+                        )
+                        .padding(.horizontal)
+                        .scaleEffect(isAnimating ? 1.0 : 0.95)
+                        .opacity(isAnimating ? 1.0 : 0.0)
+                        .animation(.easeInOut(duration: 0.5), value: isAnimating)
                         }
                     }
                     
@@ -151,41 +151,41 @@ struct ClubListView: View {
                             HStack(spacing: 15) {
                                 ForEach(Array(clubs.prefix(5).enumerated()), id: \.element.id) { index, club in
                                     NavigationLink(destination: ClubDetailView(club: club)) {
-                                        VStack(alignment: .leading, spacing: 8) {
-                                            AsyncImage(url: URL(string: club.logoURL)) { image in
-                                                image
-                                                    .resizable()
-                                                    .aspectRatio(contentMode: .fill)
-                                            } placeholder: {
-                                                Color.gray.opacity(0.3)
-                                                    .overlay(
-                                                        Image(systemName: "person.3")
-                                                            .foregroundColor(.white)
-                                                    )
-                                            }
-                                            .frame(width: 200, height: 120)
-                                            .clipped()
-                                            .cornerRadius(10)
-                                            
-                                            Text(club.name)
-                                                .font(.headline)
-                                                .lineLimit(1)
-                                            
-                                            HStack {
-                                                Label("\(club.members.count)", systemImage: "person.3")
-                                                Spacer()
-                                                Label("\(club.events.count)", systemImage: "calendar")
-                                            }
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
+                                    VStack(alignment: .leading, spacing: 8) {
+                                        AsyncImage(url: URL(string: club.logoURL)) { image in
+                                            image
+                                                .resizable()
+                                                .aspectRatio(contentMode: .fill)
+                                        } placeholder: {
+                                            Color.gray.opacity(0.3)
+                                                .overlay(
+                                                    Image(systemName: "person.3")
+                                                        .foregroundColor(.white)
+                                                )
                                         }
-                                        .frame(width: 200)
-                                        .scaleEffect(isAnimating ? 1.0 : 0.9)
-                                        .animation(
-                                            Animation.spring(response: 0.5, dampingFraction: 0.6)
-                                                .delay(Double(index) * 0.1),
-                                            value: isAnimating
-                                        )
+                                        .frame(width: 200, height: 120)
+                                        .clipped()
+                                        .cornerRadius(10)
+                                        
+                                        Text(club.name)
+                                            .font(.headline)
+                                            .lineLimit(1)
+                                        
+                                        HStack {
+                                            Label("\(club.members.count)", systemImage: "person.3")
+                                            Spacer()
+                                            Label("\(club.events.count)", systemImage: "calendar")
+                                        }
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                    }
+                                    .frame(width: 200)
+                                    .scaleEffect(isAnimating ? 1.0 : 0.9)
+                                    .animation(
+                                        Animation.spring(response: 0.5, dampingFraction: 0.6)
+                                            .delay(Double(index) * 0.1),
+                                        value: isAnimating
+                                    )
                                     }
                                 }
                             }
@@ -352,13 +352,6 @@ struct ClubListView: View {
                  members: ["user7", "user8", "user9"],
                  events: ["event5", "event6", "event7"],
                  socialMedia: ["instagram": "@sporkulubu"]),
-            Club(id: "4",
-                 name: "Müzik Kulübü",
-                 description: "Müzik etkinlikleri ve konserler düzenleyen kulüp",
-                 logoURL: "https://example.com/logo4.png",
-                 members: ["user10", "user11", "user12", "user13"],
-                 events: ["event8", "event9"],
-                 socialMedia: ["instagram": "@muzikkulubu"])
         ]
         isLoading = false
     }
@@ -398,7 +391,7 @@ struct ClubDetailView: View {
     @ObservedObject var theme = Theme.shared
     let club: Club
     @State private var isAnimating = false
-    @State private var isJoined = false
+    @ObservedObject private var userSession = UserSession.shared
     
     var body: some View {
         ScrollView {
@@ -421,9 +414,9 @@ struct ClubDetailView: View {
                 
                 VStack(alignment: .leading, spacing: 20) {
                     // Başlık ve İstatistikler
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(club.name)
-                            .font(.title)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(club.name)
+                        .font(.title)
                             .fontWeight(.bold)
                         
                         HStack(spacing: 20) {
@@ -467,28 +460,28 @@ struct ClubDetailView: View {
                             .font(.title2)
                             .fontWeight(.bold)
                         
-                        Text(club.description)
+                    Text(club.description)
                             .foregroundColor(theme.secondaryTextColor)
                     }
                     
                     // Sosyal Medya
                     if !club.socialMedia.isEmpty {
                         VStack(alignment: .leading, spacing: 10) {
-                            Text("Sosyal Medya")
-                                .font(.title2)
+                        Text("Sosyal Medya")
+                            .font(.title2)
                                 .fontWeight(.bold)
-                            
+                        
                             HStack(spacing: 15) {
-                                ForEach(Array(club.socialMedia.keys), id: \.self) { platform in
+                        ForEach(Array(club.socialMedia.keys), id: \.self) { platform in
                                     Button(action: {
                                         // TODO: Sosyal medya linkine git
                                     }) {
                                         VStack {
-                                            Image(systemName: socialMediaIcon(for: platform))
+                                Image(systemName: socialMediaIcon(for: platform))
                                                 .font(.title2)
                                             Text(platform.capitalized)
                                                 .font(.caption)
-                                        }
+                            }
                                         .foregroundColor(theme.primaryColor)
                                         .frame(width: 60, height: 60)
                                         .background(theme.primaryColor.opacity(0.1))
@@ -502,21 +495,21 @@ struct ClubDetailView: View {
                     // Etkinlikler
                     if !club.events.isEmpty {
                         VStack(alignment: .leading, spacing: 10) {
-                            Text("Etkinlikler")
-                                .font(.title2)
+                        Text("Etkinlikler")
+                            .font(.title2)
                                 .fontWeight(.bold)
-                            
-                            ForEach(club.events, id: \.self) { eventId in
-                                HStack {
-                                    Image(systemName: "calendar")
+                        
+                        ForEach(club.events, id: \.self) { eventId in
+                            HStack {
+                                Image(systemName: "calendar")
                                         .foregroundColor(theme.primaryColor)
-                                    Text(eventId)
+                                Text(eventId)
                                         .foregroundColor(theme.textColor)
                                     Spacer()
                                     Image(systemName: "chevron.right")
                                         .foregroundColor(theme.secondaryTextColor)
-                                }
-                                .padding()
+                            }
+                            .padding()
                                 .background(theme.cardBackgroundColor)
                                 .cornerRadius(15)
                             }
@@ -526,15 +519,19 @@ struct ClubDetailView: View {
                     // Katıl Butonu
                     Button(action: {
                         withAnimation {
-                            isJoined.toggle()
+                            if userSession.joinedClubs.contains(club.id) {
+                                userSession.leaveClub(club.id)
+                            } else {
+                                userSession.joinClub(club.id)
+                            }
                         }
                     }) {
-                        Text(isJoined ? "Kulüpten Ayrıl" : "Kulübe Katıl")
+                        Text(userSession.joinedClubs.contains(club.id) ? "Kulüpten Ayrıl" : "Kulübe Katıl")
                             .font(.headline)
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
                             .padding()
-                            .background(isJoined ? Color.red : theme.primaryColor)
+                            .background(userSession.joinedClubs.contains(club.id) ? Color.red : theme.primaryColor)
                             .cornerRadius(15)
                     }
                 }
