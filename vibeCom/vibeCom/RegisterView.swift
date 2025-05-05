@@ -1,17 +1,19 @@
 import SwiftUI
+import FirebaseAuth
+import FirebaseFirestore
 
 struct RegisterView: View {
     @StateObject private var theme = Theme.shared
     @Environment(\.dismiss) private var dismiss
     
-    @State private var name = ""
-    @State private var email = ""
-    @State private var password = ""
-    @State private var confirmPassword = ""
-    @State private var isLoading = false
-    @State private var showError = false
-    @State private var errorMessage = ""
-    @State private var isAnimating = false
+    @State private var name: String = ""
+    @State private var email: String = ""
+    @State private var password: String = ""
+    @State private var confirmPassword: String = ""
+    @State private var isLoading: Bool = false
+    @State private var showError: Bool = false
+    @State private var errorMessage: String = ""
+    @State private var isAnimating: Bool = false
     
     var body: some View {
         ScrollView {
@@ -25,23 +27,18 @@ struct RegisterView: View {
                 
                 // Kayıt Formu
                 VStack(spacing: 20) {
-                    // Ad Soyad
                     LoginTextField(
                         title: "Ad Soyad",
                         placeholder: "Adınız ve soyadınız",
                         text: $name,
                         icon: "person.fill"
                     )
-                    
-                    // E-posta
                     LoginTextField(
                         title: "E-posta",
                         placeholder: "E-posta adresiniz",
                         text: $email,
                         icon: "envelope.fill"
                     )
-                    
-                    // Şifre
                     LoginTextField(
                         title: "Şifre",
                         placeholder: "Şifreniz",
@@ -49,8 +46,6 @@ struct RegisterView: View {
                         icon: "lock.fill",
                         isSecure: true
                     )
-                    
-                    // Şifre Tekrar
                     LoginTextField(
                         title: "Şifre Tekrar",
                         placeholder: "Şifrenizi tekrar girin",
@@ -58,8 +53,6 @@ struct RegisterView: View {
                         icon: "lock.fill",
                         isSecure: true
                     )
-                    
-                    // Kayıt Ol Butonu
                     Button(action: register) {
                         HStack {
                             if isLoading {
@@ -85,8 +78,6 @@ struct RegisterView: View {
                     }
                     .disabled(isLoading || !isFormValid)
                     .opacity(isFormValid ? 1.0 : 0.6)
-                    
-                    // Giriş Yap Linki
                     NavigationLink(destination: LoginView()) {
                         Text("Zaten hesabın var mı? Giriş yap")
                             .foregroundColor(theme.primaryColor)
@@ -145,13 +136,41 @@ struct RegisterView: View {
     }
     
     private func register() {
+        guard isFormValid else { return }
         isLoading = true
-        
-        // Simüle edilmiş API çağrısı
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-            isLoading = false
-            // Başarılı kayıt sonrası giriş sayfasına yönlendir
-            dismiss()
+        errorMessage = ""
+        Auth.auth().createUser(withEmail: email, password: password) { result, error in
+            if let error = error {
+                isLoading = false
+                errorMessage = error.localizedDescription
+                showError = true
+                return
+            }
+            guard let user = result?.user else {
+                isLoading = false
+                errorMessage = "Kullanıcı oluşturulamadı."
+                showError = true
+                return
+            }
+            let now = Timestamp(date: Date())
+            let userData: [String: Any] = [
+                "displayName": name,
+                "email": email,
+                "photoURL": "",
+                "role": "user",
+                "clubIds": [],
+                "createdAt": now,
+                "updatedAt": now
+            ]
+            Firestore.firestore().collection("users").document(user.uid).setData(userData) { error in
+                isLoading = false
+                if let error = error {
+                    errorMessage = error.localizedDescription
+                    showError = true
+                } else {
+                    dismiss()
+                }
+            }
         }
     }
 }

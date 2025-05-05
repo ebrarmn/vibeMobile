@@ -1,13 +1,16 @@
 import SwiftUI
+import FirebaseAuth
+import FirebaseFirestore
 
 struct LoginView: View {
     @StateObject private var theme = Theme.shared
-    @State private var email = ""
-    @State private var password = ""
-    @State private var isLoading = false
-    @State private var showError = false
-    @State private var errorMessage = ""
-    @State private var isAnimating = false
+    @State private var email: String = ""
+    @State private var password: String = ""
+    @State private var isLoading: Bool = false
+    @State private var showError: Bool = false
+    @State private var errorMessage: String = ""
+    @State private var isAnimating: Bool = false
+    @State private var userData: [String: Any]? = nil // Giriş yapan kullanıcının Firestore verisi
     
     var body: some View {
         ScrollView {
@@ -101,6 +104,18 @@ struct LoginView: View {
                         .stroke(theme.primaryColor.opacity(0.3), lineWidth: 1)
                 )
                 .padding(.horizontal)
+                // Giriş başarılıysa kullanıcı verisini göster (örnek)
+                if let userData = userData {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Hoş geldin, \(userData["displayName"] as? String ?? "")!")
+                            .font(.headline)
+                        Text("E-posta: \(userData["email"] as? String ?? "")")
+                        Text("Rol: \(userData["role"] as? String ?? "")")
+                    }
+                    .padding()
+                    .background(Color.green.opacity(0.1))
+                    .cornerRadius(10)
+                }
             }
             .padding(.vertical)
         }
@@ -139,12 +154,46 @@ struct LoginView: View {
     
     private func login() {
         isLoading = true
-        
-        // Simüle edilmiş API çağrısı
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-            isLoading = false
-            // Başarılı giriş sonrası ana sayfaya yönlendir
-            // TODO: Implement actual login logic
+        errorMessage = ""
+        Auth.auth().signIn(withEmail: email, password: password) { result, error in
+            if let error = error {
+                isLoading = false
+                errorMessage = error.localizedDescription
+                showError = true
+                return
+            }
+            guard let user = result?.user else {
+                isLoading = false
+                errorMessage = "Kullanıcı bulunamadı."
+                showError = true
+                return
+            }
+            let docRef = Firestore.firestore().collection("users").document(user.uid)
+            docRef.getDocument { snapshot, error in
+                isLoading = false
+                if let error = error {
+                    errorMessage = error.localizedDescription
+                    showError = true
+                    return
+                }
+                guard let data = snapshot?.data() else {
+                    errorMessage = "Kullanıcı verisi bulunamadı."
+                    showError = true
+                    return
+                }
+                // Firestore'dan gelen veriyi AppUser modeline dönüştür
+                let appUser = AppUser(
+                    id: user.uid,
+                    displayName: data["displayName"] as? String ?? "",
+                    email: data["email"] as? String ?? "",
+                    photoURL: data["photoURL"] as? String ?? "",
+                    role: data["role"] as? String ?? "user",
+                    clubIds: data["clubIds"] as? [String] ?? [],
+                    createdAt: (data["createdAt"] as? Timestamp)?.dateValue(),
+                    updatedAt: (data["updatedAt"] as? Timestamp)?.dateValue()
+                )
+                UserSession.shared.currentUser = appUser
+            }
         }
     }
 }
@@ -162,19 +211,21 @@ struct LoginTextField: View {
             Text(title)
                 .font(.headline)
                 .foregroundColor(theme.textColor)
-            
             HStack {
                 Image(systemName: icon)
                     .foregroundColor(theme.primaryColor)
-                
                 if isSecure {
                     SecureField(placeholder, text: $text)
+                        .foregroundColor(.primary)
+                        .padding(8)
+                        .background(Color.white)
                 } else {
                     TextField(placeholder, text: $text)
+                        .foregroundColor(.primary)
+                        .padding(8)
+                        .background(Color.white)
                 }
             }
-            .padding()
-            .background(theme.backgroundColor)
             .cornerRadius(10)
             .overlay(
                 RoundedRectangle(cornerRadius: 10)

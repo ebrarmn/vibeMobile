@@ -1,12 +1,11 @@
 import SwiftUI
+import FirebaseAuth
 
 struct ProfileView: View {
     @StateObject private var theme = Theme.shared
-    @State private var user: User?
     @ObservedObject private var userSession = UserSession.shared
     @State private var allClubs: [Club] = []
     @State private var allEvents: [Event] = []
-    @State private var isLoading = true
     @State private var selectedTab = 0
     @State private var showingSettings = false
     @State private var notificationsEnabled = true
@@ -22,117 +21,130 @@ struct ProfileView: View {
     @State private var showingImagePicker = false
     @State private var selectedImage: UIImage?
     @State private var showingAdminPanel = false
+    @State private var showingLogoutAlert = false
+    @State private var isLoggedOut = false
     
     var body: some View {
         NavigationView {
-            if isLoading {
-                ProgressView()
-                    .scaleEffect(1.5)
-            } else if let user = user {
+            if let user = userSession.currentUser {
                 ScrollView {
                     VStack(spacing: 20) {
-                        // Profil Başlığı
-                        VStack(spacing: 15) {
+                        profileHeader(user: user)
+                        tabPicker(user: user)
+                        tabContent(user: user)
+                    }
+                    .padding(.vertical)
+                }
+                .background(profileBackground)
+                .navigationTitle("Profil")
+                .toolbar { }
+                .alert("Çıkış Yap", isPresented: $showingLogoutAlert) {
+                    Button("İptal", role: .cancel) { }
+                    Button("Çıkış Yap", role: .destructive) {
+                        logout()
+                    }
+                } message: {
+                    Text("Uygulamadan çıkış yapıyorsunuz. Emin misiniz?")
+                }
+            } else {
+                ProgressView()
+            }
+        }
+        .onAppear { withAnimation { isAnimating = true } }
+        .fullScreenCover(isPresented: $isLoggedOut) {
+            LoginView()
+        }
+        .sheet(isPresented: $showLanguagePicker) {
+            NavigationView {
+                List {
+                    ForEach(["Türkçe", "English", "Deutsch", "Français", "Español"], id: \.self) { language in
                             Button(action: {
-                                showingImagePicker = true
-                            }) {
-                            AsyncImage(url: URL(string: user.profileImageURL)) { image in
-                                image
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fill)
-                            } placeholder: {
-                                Image(systemName: "person.circle.fill")
-                                    .resizable()
-                                    .foregroundColor(theme.primaryColor.opacity(0.3))
+                            selectedLanguage = language
+                            showLanguagePicker = false
+                        }) {
+                            HStack {
+                                Text(language)
+                                    .foregroundColor(theme.textColor)
+                                
+                                Spacer()
+                                
+                                if language == selectedLanguage {
+                                    Image(systemName: "checkmark")
+                                        .foregroundColor(theme.primaryColor)
+                                }
                             }
-                            .frame(width: 120, height: 120)
-                            .clipShape(Circle())
-                            .overlay(
-                                Circle()
-                                    .stroke(
-                                        LinearGradient(
-                                            colors: [theme.primaryColor, theme.primaryColor.opacity(0.7)],
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                        ),
-                                        lineWidth: 3
-                                    )
-                            )
-                                .overlay(
-                                    Circle()
-                                        .fill(Color.black.opacity(0.3))
-                                        .overlay(
-                                            Image(systemName: "camera.fill")
-                                                .foregroundColor(.white)
-                                        )
-                                        .opacity(isAnimating ? 1 : 0)
-                            )
-                            .shadow(radius: 10)
-                            .scaleEffect(isAnimating ? 1.0 : 0.9)
-                            .animation(.spring(response: 0.5, dampingFraction: 0.6), value: isAnimating)
-                            }
-                            
+                        }
+                    }
+                }
+                .navigationTitle("Dil Seçimi")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button("Kapat") {
+                            showLanguagePicker = false
+                        }
+                    }
+                }
+            }
+        }
+        .sheet(isPresented: $showingEditProfile) {
+            NavigationView {
+                Form {
+                    Section(header: Text("Profil Bilgileri")) {
+                        TextField("Ad Soyad", text: $editedName)
+                        TextField("E-posta", text: $editedEmail)
+                            .keyboardType(.emailAddress)
+                            .autocapitalization(.none)
+                    }
+                    
+                    Section {
+                        Button(action: saveProfileChanges) {
+                            Text("Değişiklikleri Kaydet")
+                                .frame(maxWidth: .infinity)
+                                .foregroundColor(theme.primaryColor)
+                        }
+                    }
+                }
+                .navigationTitle("Profil Düzenle")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button("Kapat") {
+                            showingEditProfile = false
+                        }
+                    }
+                }
+            }
+        }
+        .sheet(isPresented: $showingImagePicker) {
+            ImagePicker(selectedImage: $selectedImage)
+        }
+    }
+    
+    @ViewBuilder
+    private func profileHeader(user: AppUser) -> some View {
+        VStack(spacing: 15) {
+            Button(action: { showingImagePicker = true }) {
+                profileImageView(url: user.photoURL)
+            }
                             VStack(spacing: 8) {
-                                Text(user.name)
+                Text(user.displayName)
                                     .font(.title)
                                     .fontWeight(.bold)
                                     .foregroundColor(theme.textColor)
-                                
                                 Text(user.email)
                                     .font(.subheadline)
                                     .foregroundColor(theme.secondaryTextColor)
-                                
                                 HStack(spacing: 20) {
-                                    VStack {
-                                        Text("\(userSession.joinedClubs.count)")
-                                            .font(.title2)
-                                            .fontWeight(.bold)
-                                            .foregroundStyle(
-                                                LinearGradient(
-                                                    colors: [theme.primaryColor, theme.primaryColor.opacity(0.7)],
-                                                    startPoint: .leading,
-                                                    endPoint: .trailing
-                                                )
-                                            )
-                                        Text("Kulüp")
-                                            .font(.caption)
-                                            .foregroundColor(theme.secondaryTextColor)
-                                    }
-                                    .scaleEffect(isAnimating ? 1.0 : 0.9)
-                                    .animation(.spring(response: 0.5, dampingFraction: 0.6).delay(0.1), value: isAnimating)
-                                    
-                                    Divider()
-                                        .frame(height: 30)
-                                    
-                                    VStack {
-                                        Text("\(userSession.attendingEvents.count)")
-                                            .font(.title2)
-                                            .fontWeight(.bold)
-                                            .foregroundStyle(
-                                                LinearGradient(
-                                                    colors: [theme.primaryColor, theme.primaryColor.opacity(0.7)],
-                                                    startPoint: .leading,
-                                                    endPoint: .trailing
-                                                )
-                                            )
-                                        Text("Etkinlik")
-                                            .font(.caption)
-                                            .foregroundColor(theme.secondaryTextColor)
-                                    }
-                                    .scaleEffect(isAnimating ? 1.0 : 0.9)
-                                    .animation(.spring(response: 0.5, dampingFraction: 0.6).delay(0.2), value: isAnimating)
+                    profileStatView(title: "Kulüp", value: "\(user.clubIds.count)", delay: 0.1)
+                    Divider().frame(height: 30)
+                    profileStatView(title: "Etkinlik", value: "-", delay: 0.2)
                                 }
                                 .padding(.top, 10)
                             }
                         }
                         .padding()
-                        .background(
-                            LinearGradient(
-                                colors: [theme.cardBackgroundColor, theme.cardBackgroundColor.opacity(0.8)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
+        .background(profileHeaderBackground)
                         .cornerRadius(20)
                         .shadow(color: theme.cardShadowColor, radius: 5)
                         .overlay(
@@ -143,21 +155,26 @@ struct ProfileView: View {
                         .scaleEffect(isAnimating ? 1.0 : 0.95)
                         .opacity(isAnimating ? 1.0 : 0.0)
                         .animation(.easeInOut(duration: 0.5), value: isAnimating)
+    }
                         
-                        // Tab Seçici
+    @ViewBuilder
+    private func tabPicker(user: AppUser) -> some View {
                         Picker("Seçim", selection: $selectedTab) {
                             Text("Kulüpler").tag(0)
                             Text("Etkinlikler").tag(1)
                             Text("Ayarlar").tag(2)
-                            if user.isAdmin {
+            if user.role == "admin" {
                                 Text("Admin").tag(3)
                             }
                         }
                         .pickerStyle(.segmented)
                         .padding(.horizontal)
-                        
-                        // İçerik Alanı
-                        if selectedTab == 0 {
+    }
+    
+    @ViewBuilder
+    private func tabContent(user: AppUser) -> some View {
+        switch selectedTab {
+        case 0:
                             // Kulüpler
                             VStack(alignment: .leading, spacing: 15) {
                                 HStack {
@@ -226,7 +243,7 @@ struct ProfileView: View {
                                     .padding(.horizontal)
                                 }
                             }
-                        } else if selectedTab == 1 {
+        case 1:
                             // Etkinlikler
                             VStack(alignment: .leading, spacing: 15) {
                                 HStack {
@@ -301,13 +318,13 @@ struct ProfileView: View {
                                 }
                                 .padding(.horizontal)
                             }
-                        } else if selectedTab == 2 {
+        case 2:
                             // Ayarlar Bölümü
                             VStack(spacing: 20) {
                                 // Hesap Ayarları
                                 SettingsSection(title: "Hesap Ayarları") {
                                     Button(action: {
-                                        editedName = user.name
+                        editedName = user.displayName
                                         editedEmail = user.email
                                         showingEditProfile = true
                                     }) {
@@ -403,7 +420,9 @@ struct ProfileView: View {
                                 }
                                 
                                 // Çıkış Yap
-                                NavigationLink(destination: LoginView()) {
+                                Button(action: {
+                                    showingLogoutAlert = true
+                                }) {
                                     HStack {
                                         Image(systemName: "rectangle.portrait.and.arrow.right")
                                             .foregroundColor(.red)
@@ -432,7 +451,8 @@ struct ProfileView: View {
                                 }
                                 .padding(.horizontal)
                             }
-                        } else if selectedTab == 3 && user.isAdmin {
+        case 3:
+            if user.role == "admin" {
                             // Admin Paneli
                             VStack(spacing: 20) {
                                 // Admin İstatistikleri
@@ -623,10 +643,12 @@ struct ProfileView: View {
                             }
                             .padding(.vertical)
                         }
+        default:
+            EmptyView()
                     }
-                    .padding(.vertical)
                 }
-                .background(
+    
+    private var profileBackground: some View {
                     theme.backgroundColor
                         .overlay(
                             Circle()
@@ -642,130 +664,93 @@ struct ProfileView: View {
                                 .offset(x: 100, y: 300)
                                 .blur(radius: 50)
                         )
-                )
-                .navigationTitle("Profil")
-                .toolbar {
-                    // Kalem simgesi kaldırıldı
-                }
-            }
-        }
-        .task {
-            await loadUserProfile()
-            // Örnek kulüp ve etkinlik verileri
-            allClubs = [
-                Club(id: "1", name: "Yazılım Kulübü", description: "Yazılım geliştirme ve teknoloji odaklı öğrenci kulübü", logoURL: "https://example.com/logo1.png", members: [], events: [], socialMedia: [:]),
-                Club(id: "2", name: "Tiyatro Kulübü", description: "Sahne sanatları ve tiyatro etkinlikleri düzenleyen kulüp", logoURL: "https://example.com/logo2.png", members: [], events: [], socialMedia: [:]),
-                Club(id: "3", name: "Spor Kulübü", description: "Spor etkinlikleri ve turnuvalar düzenleyen kulüp", logoURL: "https://example.com/logo3.png", members: [], events: [], socialMedia: [:]),
-            ]
-            allEvents = [
-                Event(id: "1", title: "Swift Workshop", description: "iOS uygulama geliştirme workshop'u", date: Date(), location: "A Blok Lab 1", clubId: "1", imageURL: "https://example.com/event1.jpg", attendees: [], category: .technology),
-                Event(id: "2", title: "Startup Weekend", description: "Haftasonu için startup projeleri", date: Date(), location: "Konferans Salonu", clubId: "2", imageURL: "https://example.com/event2.jpg", attendees: [], category: .art),
-                Event(id: "3", title: "Rock Konseri", description: "Açık hava rock konseri", date: Date(), location: "Kültür Park", clubId: "3", imageURL: "https://example.com/event3.jpg", attendees: [], category: .music),
-                Event(id: "4", title: "Dans Gösterisi", description: "Halay eğitimi", date: Date(), location: "C103 Sınıfı", clubId: "4", imageURL: "https://example.com/event4.jpg", attendees: [], category: .music)
-            ]
-        }
-        .onChange(of: darkModeEnabled) { newValue in
-            theme.isDarkMode = newValue
-        }
-        .onAppear {
-            withAnimation {
-                isAnimating = true
-            }
-        }
-        .sheet(isPresented: $showLanguagePicker) {
-            NavigationView {
-                List {
-                    ForEach(["Türkçe", "English", "Deutsch", "Français", "Español"], id: \.self) { language in
-                        Button(action: {
-                            selectedLanguage = language
-                            showLanguagePicker = false
-                        }) {
-                            HStack {
-                                Text(language)
-                                    .foregroundColor(theme.textColor)
-                                
-                                Spacer()
-                                
-                                if language == selectedLanguage {
-                                    Image(systemName: "checkmark")
-                                        .foregroundColor(theme.primaryColor)
-                                }
-                            }
-                        }
-                    }
-                }
-                .navigationTitle("Dil Seçimi")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .navigationBarTrailing) {
-                        Button("Kapat") {
-                            showLanguagePicker = false
-                        }
-                    }
-                }
-            }
-        }
-        .sheet(isPresented: $showingEditProfile) {
-            NavigationView {
-                Form {
-                    Section(header: Text("Profil Bilgileri")) {
-                        TextField("Ad Soyad", text: $editedName)
-                        TextField("E-posta", text: $editedEmail)
-                            .keyboardType(.emailAddress)
-                            .autocapitalization(.none)
-                    }
-                    
-                    Section {
-                        Button(action: saveProfileChanges) {
-                            Text("Değişiklikleri Kaydet")
-                                .frame(maxWidth: .infinity)
-                                .foregroundColor(theme.primaryColor)
-                        }
-                    }
-                }
-                .navigationTitle("Profil Düzenle")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .navigationBarTrailing) {
-                        Button("Kapat") {
-                            showingEditProfile = false
-                        }
-                    }
-                }
-            }
-        }
-        .sheet(isPresented: $showingImagePicker) {
-            ImagePicker(selectedImage: $selectedImage)
-        }
     }
     
-    private func loadUserProfile() async {
-        // Örnek veri - Normal kullanıcı
-        user = User(
-            id: "1",
-            name: "Ahmet Yılmaz",
-            email: "ahmet@example.com",
-            profileImageURL: "https://example.com/profile.jpg",
-            joinedClubs: ["1", "2", "3", "4"], // Kulüp ID'leri
-            attendingEvents: ["1", "2", "3", "4"], // Etkinlik ID'leri
-            isAdmin: false
+    private var profileHeaderBackground: some View {
+        LinearGradient(
+            colors: [theme.cardBackgroundColor, theme.cardBackgroundColor.opacity(0.8)],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
         )
-        isLoading = false
+    }
+    
+    @ViewBuilder
+    private func profileImageView(url: String) -> some View {
+        AsyncImage(url: URL(string: url)) { image in
+            image
+                .resizable()
+                .aspectRatio(contentMode: .fill)
+        } placeholder: {
+            Image(systemName: "person.circle.fill")
+                .resizable()
+                .foregroundColor(theme.primaryColor.opacity(0.3))
+        }
+        .frame(width: 120, height: 120)
+        .clipShape(Circle())
+        .overlay(
+            Circle()
+                .stroke(
+                    LinearGradient(
+                        colors: [theme.primaryColor, theme.primaryColor.opacity(0.7)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 3
+                )
+        )
+        .overlay(
+            Circle()
+                .fill(Color.black.opacity(0.3))
+                .overlay(
+                    Image(systemName: "camera.fill")
+                        .foregroundColor(.white)
+                )
+                .opacity(isAnimating ? 1 : 0)
+        )
+        .shadow(radius: 10)
+        .scaleEffect(isAnimating ? 1.0 : 0.9)
+        .animation(.spring(response: 0.5, dampingFraction: 0.6), value: isAnimating)
+    }
+    
+    @ViewBuilder
+    private func profileStatView(title: String, value: String, delay: Double) -> some View {
+        VStack {
+            Text(value)
+                .font(.title2)
+                .fontWeight(.bold)
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [theme.primaryColor, theme.primaryColor.opacity(0.7)],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+            Text(title)
+                .font(.caption)
+                .foregroundColor(theme.secondaryTextColor)
+        }
+        .scaleEffect(isAnimating ? 1.0 : 0.9)
+        .animation(.spring(response: 0.5, dampingFraction: 0.6).delay(delay), value: isAnimating)
     }
     
     private func saveProfileChanges() {
         // Simüle edilmiş API çağrısı
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-            user = User(
-                id: user?.id ?? "",
-                name: editedName,
-                email: editedEmail,
-                profileImageURL: user?.profileImageURL ?? "",
-                joinedClubs: user?.joinedClubs ?? [],
-                attendingEvents: user?.attendingEvents ?? [],
-                isAdmin: user?.isAdmin ?? false
-            )
+            // Kullanıcı bilgilerinin güncellenmesi işlemi
             showingEditProfile = false
+        }
+    }
+    
+    private func logout() {
+        do {
+            try Auth.auth().signOut()
+            userSession.currentUser = nil
+            userSession.userId = ""
+            userSession.joinedClubs = []
+            userSession.attendingEvents = []
+            isLoggedOut = true
+        } catch {
+            print("Çıkış yapılırken hata oluştu: \(error.localizedDescription)")
         }
     }
 }
