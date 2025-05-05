@@ -16,7 +16,7 @@ Yapay zeka destekli öneri sistemleri ve kullanıcı dostu tasarımıyla kulüp 
 - Üniversite kulüplerinin etkinlik süreçlerini dijitalleştirmek
 - Kulüplerle üyeler arasında etkili bir iletişim köprüsü kurmak
 - Kullanıcıya özel etkinlik ve kulüp önerileri sunmak
-- Etkinlik duyuruları, mesajlaşma ve organizasyon işlemlerini tek bir platformda toplamak
+- Etkinlik duyuruları ve organizasyon işlemlerini tek bir platformda toplamak
 
 ---
 
