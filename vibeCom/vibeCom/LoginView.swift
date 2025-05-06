@@ -11,6 +11,8 @@ struct LoginView: View {
     @State private var errorMessage: String = ""
     @State private var isAnimating: Bool = false
     @State private var userData: [String: Any]? = nil // Giriş yapan kullanıcının Firestore verisi
+    @State private var showResetAlert: Bool = false
+    @State private var resetMessage: String = ""
     
     var body: some View {
         ScrollView {
@@ -82,6 +84,14 @@ struct LoginView: View {
                     .disabled(isLoading || !isFormValid)
                     .opacity(isFormValid ? 1.0 : 0.6)
                     
+                    // Şifremi Unuttum Butonu
+                    Button(action: sendPasswordReset) {
+                        Text("Şifremi Unuttum")
+                            .foregroundColor(theme.primaryColor)
+                            .font(.subheadline)
+                    }
+                    .disabled(email.isEmpty)
+                    
                     // Kayıt Ol Linki
                     NavigationLink(destination: RegisterView()) {
                         Text("Hesabın yok mu? Kayıt ol")
@@ -141,6 +151,11 @@ struct LoginView: View {
         } message: {
             Text(errorMessage)
         }
+        .alert("Şifre Sıfırlama", isPresented: $showResetAlert) {
+            Button("Tamam", role: .cancel) {}
+        } message: {
+            Text(resetMessage)
+        }
         .onAppear {
             withAnimation {
                 isAnimating = true
@@ -170,29 +185,72 @@ struct LoginView: View {
             }
             let docRef = Firestore.firestore().collection("users").document(user.uid)
             docRef.getDocument { snapshot, error in
-                isLoading = false
                 if let error = error {
+                    isLoading = false
                     errorMessage = error.localizedDescription
                     showError = true
                     return
                 }
-                guard let data = snapshot?.data() else {
-                    errorMessage = "Kullanıcı verisi bulunamadı."
-                    showError = true
-                    return
+                if let data = snapshot?.data() {
+                    // Kullanıcı verisi bulundu, normal akış
+                    isLoading = false
+                    let appUser = AppUser(
+                        id: user.uid,
+                        displayName: data["displayName"] as? String ?? "",
+                        email: data["email"] as? String ?? "",
+                        photoURL: data["photoURL"] as? String ?? "",
+                        role: data["role"] as? String ?? "user",
+                        clubIds: data["clubIds"] as? [String] ?? [],
+                        createdAt: (data["createdAt"] as? Timestamp)?.dateValue(),
+                        updatedAt: (data["updatedAt"] as? Timestamp)?.dateValue()
+                    )
+                    UserSession.shared.currentUser = appUser
+                } else {
+                    // Kullanıcı verisi yok, otomatik oluştur
+                    let now: Timestamp = Timestamp(date: Date())
+                    let userData: [String: Any] = [
+                        "displayName": user.displayName ?? "",
+                        "email": user.email ?? "",
+                        "photoURL": user.photoURL?.absoluteString ?? "",
+                        "role": "user",
+                        "clubIds": [],
+                        "createdAt": now,
+                        "updatedAt": now
+                    ]
+                    docRef.setData(userData) { error in
+                        isLoading = false
+                        if let error = error {
+                            errorMessage = "Kullanıcı profili oluşturulamadı: \(error.localizedDescription)"
+                            showError = true
+                            return
+                        }
+                        let appUser = AppUser(
+                            id: user.uid,
+                            displayName: user.displayName ?? "",
+                            email: user.email ?? "",
+                            photoURL: user.photoURL?.absoluteString ?? "",
+                            role: "user",
+                            clubIds: [],
+                            createdAt: now.dateValue(),
+                            updatedAt: now.dateValue()
+                        )
+                        UserSession.shared.currentUser = appUser
+                    }
                 }
-                // Firestore'dan gelen veriyi AppUser modeline dönüştür
-                let appUser = AppUser(
-                    id: user.uid,
-                    displayName: data["displayName"] as? String ?? "",
-                    email: data["email"] as? String ?? "",
-                    photoURL: data["photoURL"] as? String ?? "",
-                    role: data["role"] as? String ?? "user",
-                    clubIds: data["clubIds"] as? [String] ?? [],
-                    createdAt: (data["createdAt"] as? Timestamp)?.dateValue(),
-                    updatedAt: (data["updatedAt"] as? Timestamp)?.dateValue()
-                )
-                UserSession.shared.currentUser = appUser
+            }
+        }
+    }
+    
+    private func sendPasswordReset() {
+        guard !email.isEmpty else { return }
+        Auth.auth().sendPasswordReset(withEmail: email) { error in
+            DispatchQueue.main.async {
+                if let error = error {
+                    resetMessage = "Hata: \(error.localizedDescription)"
+                } else {
+                    resetMessage = "Şifre sıfırlama e-postası gönderildi. Lütfen e-posta kutunu kontrol et."
+                }
+                showResetAlert = true
             }
         }
     }
@@ -206,6 +264,8 @@ struct LoginTextField: View {
     let icon: String
     var isSecure: Bool = false
     
+    @State private var isPasswordVisible: Bool = false
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
@@ -215,12 +275,30 @@ struct LoginTextField: View {
                 Image(systemName: icon)
                     .foregroundColor(theme.primaryColor)
                 if isSecure {
-                    SecureField(placeholder, text: $text)
+                    ZStack(alignment: .trailing) {
+                        Group {
+                            if isPasswordVisible {
+                                TextField(placeholder, text: $text)
+                                    .autocapitalization(.none)
+                                    .disableAutocorrection(true)
+                            } else {
+                                SecureField(placeholder, text: $text)
+                            }
+                        }
                         .foregroundColor(.primary)
                         .padding(8)
                         .background(Color.white)
+                        Button(action: { isPasswordVisible.toggle() }) {
+                            Image(systemName: isPasswordVisible ? "eye.slash" : "eye")
+                                .foregroundColor(.gray)
+                        }
+                        .padding(.trailing, 8)
+                    }
                 } else {
                     TextField(placeholder, text: $text)
+                        .keyboardType(title.lowercased().contains("mail") ? .emailAddress : .default)
+                        .autocapitalization(title.lowercased().contains("mail") ? .none : .sentences)
+                        .disableAutocorrection(title.lowercased().contains("mail"))
                         .foregroundColor(.primary)
                         .padding(8)
                         .background(Color.white)

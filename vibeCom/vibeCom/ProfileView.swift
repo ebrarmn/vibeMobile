@@ -75,7 +75,7 @@ struct ProfileView: View {
                             }
                         }
                     }
-                }
+                            }
                 .navigationTitle("Dil Seçimi")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
@@ -126,7 +126,7 @@ struct ProfileView: View {
         VStack(spacing: 15) {
             Button(action: { showingImagePicker = true }) {
                 profileImageView(url: user.photoURL)
-            }
+                            }
                             VStack(spacing: 8) {
                 Text(user.displayName)
                                     .font(.title)

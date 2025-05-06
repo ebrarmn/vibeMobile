@@ -14,6 +14,8 @@ struct RegisterView: View {
     @State private var showError: Bool = false
     @State private var errorMessage: String = ""
     @State private var isAnimating: Bool = false
+    @State private var showResetAlert: Bool = false
+    @State private var resetMessage: String = ""
     
     var body: some View {
         ScrollView {
@@ -83,6 +85,13 @@ struct RegisterView: View {
                             .foregroundColor(theme.primaryColor)
                             .font(.subheadline)
                     }
+                    // Şifremi Unuttum Butonu
+                    Button(action: sendPasswordReset) {
+                        Text("Şifremi Unuttum")
+                            .foregroundColor(theme.primaryColor)
+                            .font(.subheadline)
+                    }
+                    .disabled(email.isEmpty)
                 }
                 .padding()
                 .background(
@@ -124,6 +133,11 @@ struct RegisterView: View {
         } message: {
             Text(errorMessage)
         }
+        .alert("Şifre Sıfırlama", isPresented: $showResetAlert) {
+            Button("Tamam", role: .cancel) {}
+        } message: {
+            Text(resetMessage)
+        }
         .onAppear {
             withAnimation {
                 isAnimating = true
@@ -163,13 +177,27 @@ struct RegisterView: View {
                 "updatedAt": now
             ]
             Firestore.firestore().collection("users").document(user.uid).setData(userData) { error in
-                isLoading = false
+            isLoading = false
                 if let error = error {
                     errorMessage = error.localizedDescription
                     showError = true
                 } else {
-                    dismiss()
+            dismiss()
                 }
+            }
+        }
+    }
+    
+    private func sendPasswordReset() {
+        guard !email.isEmpty else { return }
+        Auth.auth().sendPasswordReset(withEmail: email) { error in
+            DispatchQueue.main.async {
+                if let error = error {
+                    resetMessage = "Hata: \(error.localizedDescription)"
+                } else {
+                    resetMessage = "Şifre sıfırlama e-postası gönderildi. Lütfen e-posta kutunu kontrol et."
+                }
+                showResetAlert = true
             }
         }
     }

@@ -1,4 +1,7 @@
 import SwiftUI
+import FirebaseFirestore
+import FirebaseAuth
+import Foundation
 
 struct ClubRegistrationView: View {
     @StateObject private var theme = Theme.shared
@@ -138,12 +141,41 @@ struct ClubRegistrationView: View {
     }
     
     private func submitForm() {
+        guard let userId = UserSession.shared.currentUser?.id else { return }
         isSubmitting = true
-        
-        // Simüle edilmiş API çağrısı
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+        let application = ClubApplication(
+            id: UUID().uuidString,
+            name: clubName,
+            description: clubPurpose,
+            targetAudience: targetAudience,
+            activities: activities,
+            createdBy: userId,
+            createdAt: Date()
+        )
+        saveApplicationToFirestore(application: application)
+    }
+
+    private func saveApplicationToFirestore(application: ClubApplication) {
+        let db: Firestore = Firestore.firestore()
+        do {
+            try db.collection("pendingClubs").document(application.id).setData(from: application) { error in
+                DispatchQueue.main.async {
+                    isSubmitting = false
+                    if let error = error {
+                        // Hata mesajı göster
+                        print("Başvuru kaydedilemedi: \(error.localizedDescription)")
+                    } else {
+                        clubName = ""
+                        clubPurpose = ""
+                        targetAudience = ""
+                        activities = ""
+                        showSuccessAlert = true
+                    }
+                }
+            }
+        } catch {
             isSubmitting = false
-            showSuccessAlert = true
+            print("Firestore encode hatası: \(error.localizedDescription)")
         }
     }
 }
