@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import FirebaseFirestore
 
 struct AppUser: Identifiable, Codable {
     let id: String
@@ -25,15 +26,43 @@ class UserSession: ObservableObject {
     func joinClub(_ clubId: String) {
         if !joinedClubs.contains(clubId) {
             joinedClubs.append(clubId)
-            // Kulüp katılımını kaydet
-            saveUserData()
+            
+            // Firebase'e kulüp üyeliğini kaydet
+            if let userId = currentUser?.id {
+                let db = Firestore.firestore()
+                
+                // Kullanıcının kulüp listesini güncelle
+                db.collection("users").document(userId).updateData([
+                    "clubIds": FieldValue.arrayUnion([clubId])
+                ])
+                
+                // Kulübün üye listesini güncelle
+                db.collection("clubs").document(clubId).updateData([
+                    "memberIds": FieldValue.arrayUnion([userId])
+                ])
+            }
         }
     }
     
     func leaveClub(_ clubId: String) {
-        joinedClubs.removeAll { $0 == clubId }
-        // Kulüp ayrılmayı kaydet
-        saveUserData()
+        if joinedClubs.contains(clubId) {
+            joinedClubs.removeAll { $0 == clubId }
+            
+            // Firebase'den kulüp üyeliğini kaldır
+            if let userId = currentUser?.id {
+                let db = Firestore.firestore()
+                
+                // Kullanıcının kulüp listesini güncelle
+                db.collection("users").document(userId).updateData([
+                    "clubIds": FieldValue.arrayRemove([clubId])
+                ])
+                
+                // Kulübün üye listesini güncelle
+                db.collection("clubs").document(clubId).updateData([
+                    "memberIds": FieldValue.arrayRemove([userId])
+                ])
+            }
+        }
     }
     
     func attendEvent(_ eventId: String) {

@@ -1,8 +1,10 @@
 import SwiftUI
+import FirebaseFirestore
 
 struct EventsView: View {
     @StateObject private var theme = Theme.shared
     @State private var events: [Event] = []
+    @State private var clubs: [Club] = []
     @State private var isLoading = true
     @State private var selectedCategory: EventCategory = .all
     @State private var searchText = ""
@@ -30,7 +32,8 @@ struct EventsView: View {
                     
                     // Öne çıkan etkinlik
                     if let featuredEvent = events.first {
-                        FeaturedEventView(event: featuredEvent)
+                        let clubName = clubs.first(where: { $0.id == featuredEvent.clubId })?.name ?? "Bilinmeyen Kulüp"
+                        FeaturedEventView(event: featuredEvent, clubName: clubName)
                             .padding(.horizontal)
                             .scaleEffect(isAnimating ? 1.0 : 0.95)
                             .opacity(isAnimating ? 1.0 : 0.0)
@@ -60,7 +63,8 @@ struct EventsView: View {
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 15) {
                                 ForEach(Array(events.prefix(5).enumerated()), id: \.element.id) { index, event in
-                                    WeeklyEventCard(event: event)
+                                    let clubName = clubs.first(where: { $0.id == event.clubId })?.name ?? "Bilinmeyen Kulüp"
+                                    WeeklyEventCard(event: event, clubName: clubName)
                                         .scaleEffect(isAnimating ? 1.0 : 0.9)
                                         .animation(
                                             Animation.spring(response: 0.5, dampingFraction: 0.6)
@@ -95,7 +99,8 @@ struct EventsView: View {
                         
                         LazyVStack(spacing: 15) {
                             ForEach(Array(filteredEvents.enumerated()), id: \.element.id) { index, event in
-                                EventCard(event: event)
+                                let clubName = clubs.first(where: { $0.id == event.clubId })?.name ?? "Bilinmeyen Kulüp"
+                                EventCard(event: event, clubName: clubName)
                                     .padding(.horizontal)
                                     .scaleEffect(isAnimating ? 1.0 : 0.95)
                                     .opacity(isAnimating ? 1.0 : 0.0)
@@ -132,6 +137,7 @@ struct EventsView: View {
         }
         .task {
             await loadEvents()
+            await loadClubs()
         }
         .onAppear {
             withAnimation {
@@ -159,14 +165,69 @@ struct EventsView: View {
     
     private func loadEvents() async {
         isLoading = true
-        // Örnek veriler
-        events = [
-            Event(id: "1", title: "Swift Workshop", description: "iOS uygulama geliştirme workshop'u", date: Date(), location: "A Blok Lab 1", clubId: "1", imageURL: "https://example.com/event1.jpg", attendees: ["user1", "user2"], category: .technology),
-            Event(id: "2", title: "Startup Weekend", description: "48 saat sürecek girişimcilik etkinliği", date: Date().addingTimeInterval(86400), location: "Konferans Salonu", clubId: "2", imageURL: "https://example.com/event2.jpg", attendees: ["user3"], category: .business),
-            Event(id: "3", title: "Rock Konseri", description: "Kampüs rock grubu konseri", date: Date().addingTimeInterval(172800), location: "Amfi Tiyatro", clubId: "3", imageURL: "https://example.com/event3.jpg", attendees: ["user1", "user4", "user5"], category: .music),
-            Event(id: "4", title: "Dans Gösterisi", description: "Modern dans gösterisi", date: Date().addingTimeInterval(259200), location: "Spor Salonu", clubId: "4", imageURL: "https://example.com/event4.jpg", attendees: ["user2", "user6"], category: .art)
-        ]
-        isLoading = false
+        let db: Firestore = Firestore.firestore()
+        db.collection("events").getDocuments { snapshot, error in
+            DispatchQueue.main.async {
+                isLoading = false
+                if let error = error {
+                    print("Etkinlikler çekilemedi: \(error.localizedDescription)")
+                    events = []
+                    return
+                }
+                guard let documents = snapshot?.documents else {
+                    events = []
+                    return
+                }
+                events = documents.compactMap { doc in
+                    let data = doc.data()
+                    // Kategori string'den enum'a dönüştürülüyor
+                    let categoryRaw = data["category"] as? String ?? "all"
+                    let category = EventCategory(rawValue: categoryRaw) ?? .all
+                    return Event(
+                        id: doc.documentID,
+                        title: data["title"] as? String ?? "",
+                        description: data["description"] as? String ?? "",
+                        date: (data["startDate"] as? Timestamp)?.dateValue() ?? Date(),
+                        location: data["location"] as? String ?? "",
+                        clubId: data["clubId"] as? String ?? "",
+                        imageURL: data["imageURL"] as? String ?? "",
+                        attendees: data["attendeeIds"] as? [String] ?? [],
+                        category: category
+                    )
+                }
+            }
+        }
+    }
+    
+    private func loadClubs() async {
+        let db: Firestore = Firestore.firestore()
+        db.collection("clubs").getDocuments { snapshot, error in
+            DispatchQueue.main.async {
+                if let error = error {
+                    print("Kulüpler çekilemedi: \(error.localizedDescription)")
+                    clubs = []
+                    return
+                }
+                guard let documents = snapshot?.documents else {
+                    clubs = []
+                    return
+                }
+                clubs = documents.compactMap { doc in
+                    let data = doc.data()
+                    return Club(
+                        id: doc.documentID,
+                        name: data["name"] as? String ?? "",
+                        description: data["description"] as? String ?? "",
+                        logoURL: data["logoURL"] as? String ?? "",
+                        members: data["memberIds"] as? [String] ?? [],
+                        events: data["eventIds"] as? [String] ?? [],
+                        socialMedia: data["socialMedia"] as? [String: String] ?? [:],
+                        leaderID: data["leaderId"] as? String ?? "",
+                        isActive: data["isActive"] as? Bool ?? true
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -349,6 +410,7 @@ struct EventDetailView: View {
 
 struct FeaturedEventView: View {
     let event: Event
+    let clubName: String
     
     var body: some View {
         NavigationLink(destination: EventDetailView(event: event)) {
@@ -373,16 +435,16 @@ struct FeaturedEventView: View {
                     .font(.caption)
                     .fontWeight(.bold)
                     .foregroundColor(.blue)
-                
                 Text(event.title)
                     .font(.title2)
                     .fontWeight(.bold)
-                
+                Text("Düzenleyen: \(clubName)")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
                 Text(event.description)
                     .font(.subheadline)
                     .foregroundColor(.secondary)
                     .lineLimit(2)
-                
                 HStack {
                     Label(event.date.formatted(date: .abbreviated, time: .shortened),
                           systemImage: "calendar")
@@ -403,6 +465,7 @@ struct FeaturedEventView: View {
 
 struct WeeklyEventCard: View {
     let event: Event
+    let clubName: String
     
     var body: some View {
         NavigationLink(destination: EventDetailView(event: event)) {
@@ -420,22 +483,22 @@ struct WeeklyEventCard: View {
             }
             .frame(width: 200, height: 120)
                 .clipShape(RoundedRectangle(cornerRadius: 10))
-            
-                VStack(alignment: .leading, spacing: 4) {
-            Text(event.title)
-                .font(.headline)
-                .lineLimit(1)
-            
-            Text(event.date.formatted(date: .abbreviated, time: .shortened))
-                .font(.caption)
-                .foregroundColor(.secondary)
-                    
-                    Text(event.location)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .lineLimit(1)
-                }
-                .padding(.horizontal, 8)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(event.title)
+                    .font(.headline)
+                    .lineLimit(1)
+                Text("Düzenleyen: \(clubName)")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                Text(event.date.formatted(date: .abbreviated, time: .shortened))
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                Text(event.location)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+            }
+            .padding(.horizontal, 8)
         }
         .frame(width: 200)
             .background(Color(.systemBackground))
@@ -447,6 +510,7 @@ struct WeeklyEventCard: View {
 
 struct EventCard: View {
     let event: Event
+    let clubName: String
     
     var body: some View {
         NavigationLink(destination: EventDetailView(event: event)) {
@@ -464,16 +528,16 @@ struct EventCard: View {
             }
             .frame(width: 80, height: 80)
             .clipShape(RoundedRectangle(cornerRadius: 10))
-            
             VStack(alignment: .leading, spacing: 4) {
                 Text(event.title)
                     .font(.headline)
-                
+                Text("Düzenleyen: \(clubName)")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
                 Text(event.description)
                     .font(.subheadline)
                     .foregroundColor(.secondary)
                     .lineLimit(2)
-                
                 HStack {
                     Label(event.date.formatted(date: .abbreviated, time: .shortened),
                           systemImage: "calendar")

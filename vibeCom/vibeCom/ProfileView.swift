@@ -1,5 +1,6 @@
 import SwiftUI
 import FirebaseAuth
+import FirebaseFirestore
 
 struct ProfileView: View {
     @StateObject private var theme = Theme.shared
@@ -45,6 +46,9 @@ struct ProfileView: View {
                     }
                 } message: {
                     Text("Uygulamadan çıkış yapıyorsunuz. Emin misiniz?")
+                }
+                .onAppear {
+                    loadUserClubs()
                 }
             } else {
                 ProgressView()
@@ -117,7 +121,7 @@ struct ProfileView: View {
             }
         }
         .sheet(isPresented: $showingImagePicker) {
-            ImagePicker(selectedImage: $selectedImage)
+            CustomImagePicker(selectedImage: $selectedImage)
         }
     }
     
@@ -206,15 +210,19 @@ struct ProfileView: View {
                                                 VStack(spacing: 10) {
                                                     Image(systemName: "person.3.fill")
                                                         .font(.system(size: 30))
-                                                        .foregroundColor(.purple)
+                                                        .foregroundColor(club.leaderID == userSession.currentUser?.id ? .purple : .blue)
                                                         .frame(width: 60, height: 60)
-                                                        .background(Color.purple.opacity(0.1))
+                                                        .background((club.leaderID == userSession.currentUser?.id ? Color.purple : Color.blue).opacity(0.1))
                                                         .clipShape(Circle())
                                                     
                                                     Text(club.name)
                                                         .font(.subheadline)
                                                         .fontWeight(.medium)
                                                         .lineLimit(1)
+                                                    
+                                                    Text(club.leaderID == userSession.currentUser?.id ? "Başkan" : "Üye")
+                                                        .font(.caption)
+                                                        .foregroundColor(club.leaderID == userSession.currentUser?.id ? .purple : .blue)
                                                 }
                                                 .frame(width: 100)
                                                 .padding()
@@ -753,6 +761,32 @@ struct ProfileView: View {
             print("Çıkış yapılırken hata oluştu: \(error.localizedDescription)")
         }
     }
+    
+    private func loadUserClubs() {
+        guard let userId = userSession.currentUser?.id else { return }
+        
+        let db = Firestore.firestore()
+        db.collection("clubs")
+            .whereField("memberIds", arrayContains: userId)
+            .getDocuments { snapshot, error in
+                if let documents = snapshot?.documents {
+                    allClubs = documents.compactMap { doc in
+                        let data = doc.data()
+                        return Club(
+                            id: doc.documentID,
+                            name: data["name"] as? String ?? "",
+                            description: data["description"] as? String ?? "",
+                            logoURL: data["logoURL"] as? String ?? "",
+                            members: data["memberIds"] as? [String] ?? [],
+                            events: data["eventIds"] as? [String] ?? [],
+                            socialMedia: data["socialMedia"] as? [String: String] ?? [:],
+                            leaderID: data["leaderId"] as? String ?? "",
+                            isActive: data["isActive"] as? Bool ?? true
+                        )
+                    }
+                }
+            }
+    }
 }
 
 // Ayarlar Bölümü için Yardımcı Görünümler
@@ -852,7 +886,7 @@ struct ProfileView_Previews: PreviewProvider {
 }
 
 // ImagePicker yapısı
-struct ImagePicker: UIViewControllerRepresentable {
+struct CustomImagePicker: UIViewControllerRepresentable {
     @Binding var selectedImage: UIImage?
     @Environment(\.presentationMode) private var presentationMode
     
@@ -870,9 +904,9 @@ struct ImagePicker: UIViewControllerRepresentable {
     }
     
     class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
-        let parent: ImagePicker
+        let parent: CustomImagePicker
         
-        init(_ parent: ImagePicker) {
+        init(_ parent: CustomImagePicker) {
             self.parent = parent
         }
         

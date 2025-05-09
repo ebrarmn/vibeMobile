@@ -297,7 +297,7 @@ struct LoginTextField: View {
                 } else {
                     TextField(placeholder, text: $text)
                         .keyboardType(title.lowercased().contains("mail") ? .emailAddress : .default)
-                        .autocapitalization(title.lowercased().contains("mail") ? .none : .sentences)
+                        .autocapitalization(.none)
                         .disableAutocorrection(title.lowercased().contains("mail"))
                         .foregroundColor(.primary)
                         .padding(8)

@@ -40,7 +40,9 @@ struct RootView: View {
     @ObservedObject private var userSession = UserSession.shared
     var body: some View {
         if userSession.currentUser == nil {
-            LoginView()
+            NavigationView {
+                LoginView()
+            }
         } else {
             HomeView()
         }

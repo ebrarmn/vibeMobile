@@ -1,8 +1,15 @@
 import SwiftUI
+import FirebaseFirestore
 
+//VStack:alt alta (dikey) bileşen yerleştirir.
+//HStack:yan yana (yatay) bileşen yerleştirir.
+//ZStack:üst üste (z-ekseni boyunca) bileşen yerleştirir.
 struct HomeView: View {
     @StateObject private var theme = Theme.shared
+    //@StateObject:Karmaşık sınıf tabanlı tabanlı verileri yönetmek için görünümde oluşturulan ve sahip olunan bir ObservableObject'i tanımlar.
+    //@State yerel bir veri saklamak için kullanılır
     @State private var isAnimating = false
+    @State private var userClubs: [Club] = []
     
     var body: some View {
         TabView {
@@ -21,17 +28,62 @@ struct HomeView: View {
                     Label("Kulüpler", systemImage: "person.3")
                 }
             
+            if let currentUser = UserSession.shared.currentUser {
+                let leaderClubs = userClubs.filter { $0.leaderID == currentUser.id }
+                if leaderClubs.count == 1 {
+                    ClubManagementView(club: leaderClubs[0])
+                        .tabItem {
+                            Label("Kulübüm", systemImage: "person.2.circle.fill")
+                        }
+                } else if leaderClubs.count > 1 {
+                    ClubManagerSelectorView(leaderClubs: leaderClubs)
+                        .tabItem {
+                            Label("Kulübüm", systemImage: "person.2.circle.fill")
+                        }
+                }
+            }
+            
             ProfileView()
                 .tabItem {
                     Label("Profil", systemImage: "person")
                 }
         }
         .accentColor(theme.primaryColor)
+        .onAppear {
+            loadUserClubs()
+        }
+    }
+    
+    private func loadUserClubs() {
+        guard let currentUser = UserSession.shared.currentUser else { return }
+        
+        let db = Firestore.firestore()
+        db.collection("clubs")
+            .whereField("memberIds", arrayContains: currentUser.id)
+            .getDocuments { snapshot, error in
+                if let documents = snapshot?.documents {
+                    userClubs = documents.compactMap { doc in
+                        let data = doc.data()
+                        return Club(
+                            id: doc.documentID,
+                            name: data["name"] as? String ?? "",
+                            description: data["description"] as? String ?? "",
+                            logoURL: data["logoURL"] as? String ?? "",
+                            members: data["memberIds"] as? [String] ?? [],
+                            events: data["eventIds"] as? [String] ?? [],
+                            socialMedia: data["socialMedia"] as? [String: String] ?? [:],
+                            leaderID: data["leaderId"] as? String ?? "",
+                            isActive: data["isActive"] as? Bool ?? true
+                        )
+                    }
+                }
+            }
     }
 }
 
 struct MainView: View {
     @ObservedObject var theme = Theme.shared
+    //@ObservedObject:Dışardan gelen bir ObservableObject'i gözlemleyerek değişikliklerinde görünümü yeniler,ancak sahiplenemez.
     @State private var isAnimating = false
     @State private var selectedTab = 0
     @State private var featuredEvents: [Event] = []
@@ -81,44 +133,61 @@ struct MainView: View {
     }
     
     private func loadData() {
-        // Örnek etkinlik verileri
-        featuredEvents = [
-            Event(id: "1", title: "Swift Workshop", description: "iOS uygulama geliştirme workshop'u", date: Date(), location: "A Blok Lab 1", clubId: "1", imageURL: "https://example.com/event1.jpg", attendees: ["user1", "user2"], category: .technology),
-            Event(id: "2", title: "Startup Weekend", description: "48 saat sürecek girişimcilik etkinliği", date: Date().addingTimeInterval(86400), location: "Konferans Salonu", clubId: "2", imageURL: "https://example.com/event2.jpg", attendees: ["user3"], category: .business),
-            Event(id: "3", title: "Basketbol Turnuvası", description: "Kampüs basketbol turnuvası", date: Date().addingTimeInterval(172800), location: "Çok amaçlı salon", clubId: "3", imageURL: "https://example.com/event3.jpg", attendees: ["user1", "user4", "user5"], category: .music)
-        ]
-        
-        // Örnek kulüp verileri
-        popularClubs = [
-            Club(id: "1", 
-                 name: "Yazılım Kulübü",
-                 description: "Yazılım geliştirme ve teknoloji odaklı öğrenci kulübü",
-                 logoURL: "https://example.com/logo1.png",
-                 members: ["user1", "user2", "user3", "user4", "user5"],
-                 events: ["event1", "event2", "event3"],
-                 socialMedia: ["twitter": "@yazilimkulubu"]),
-            Club(id: "2",
-                 name: "Tiyatro Kulübü",
-                 description: "Sahne sanatları ve tiyatro etkinlikleri düzenleyen kulüp",
-                 logoURL: "https://example.com/logo2.png",
-                 members: ["user3", "user4", "user5", "user6"],
-                 events: ["event3", "event4"],
-                 socialMedia: ["instagram": "@tiyatrokulubu"]),
-            Club(id: "3",
-                 name: "Spor Kulübü",
-                 description: "Spor etkinlikleri ve turnuvalar düzenleyen kulüp",
-                 logoURL: "https://example.com/logo3.png",
-                 members: ["user7", "user8", "user9"],
-                 events: ["event5", "event6", "event7"],
-                 socialMedia: ["instagram": "@sporkulubu"])
-        ]
-        
-        // Örnek yaklaşan etkinlik verileri
-        upcomingEvents = [
-            Event(id: "4", title: "Dans Gösterisi", description: "Modern dans gösterisi", date: Date().addingTimeInterval(259200), location: "Spor Salonu", clubId: "4", imageURL: "https://example.com/event4.jpg", attendees: ["user2", "user6"], category: .art),
-            Event(id: "5", title: "Basketbol Turnuvası", description: "Kampüs basketbol turnuvası", date: Date().addingTimeInterval(345600), location: "Spor Salonu", clubId: "3", imageURL: "https://example.com/event5.jpg", attendees: ["user7", "user8", "user9"], category: .sports),
-            Event(id: "6", title: "Kariyer Günleri", description: "Mezuniyet sonrası kariyer fırsatları", date: Date().addingTimeInterval(432000), location: "Konferans Salonu", clubId: "1", imageURL: "https://example.com/event6.jpg", attendees: ["user1", "user2", "user3"], category: .business)
-        ]
+        let db: Firestore = Firestore.firestore()
+        // Etkinlikler
+        db.collection("events").getDocuments { snapshot, error in
+            DispatchQueue.main.async {
+                if let documents = snapshot?.documents {
+                    let allEvents = documents.compactMap { doc -> Event? in
+                        let data = doc.data()
+                        let categoryRaw = data["category"] as? String ?? "all"
+                        let category = EventCategory(rawValue: categoryRaw) ?? .all
+                        return Event(
+                            id: doc.documentID,
+                            title: data["title"] as? String ?? "",
+                            description: data["description"] as? String ?? "",
+                            date: (data["startDate"] as? Timestamp)?.dateValue() ?? Date(),
+                            location: data["location"] as? String ?? "",
+                            clubId: data["clubId"] as? String ?? "",
+                            imageURL: data["imageURL"] as? String ?? "",
+                            attendees: data["attendeeIds"] as? [String] ?? [],
+                            category: category
+                        )
+                    }
+                    // Öne çıkanlar: en yeni 3 etkinlik
+                    featuredEvents = Array(allEvents.prefix(3))
+                    // Yaklaşanlar: bugünden sonraki etkinlikler
+                    let now = Date()
+                    upcomingEvents = allEvents.filter { $0.date > now }.sorted { $0.date < $1.date }.prefix(5).map { $0 }
+                } else {
+                    featuredEvents = []
+                    upcomingEvents = []
+                }
+            }
+        }
+        // Kulüpler
+        db.collection("clubs").getDocuments { snapshot, error in
+            DispatchQueue.main.async {
+                if let documents = snapshot?.documents {
+                    popularClubs = documents.compactMap { doc in
+                        let data = doc.data()
+                        return Club(
+                            id: doc.documentID,
+                            name: data["name"] as? String ?? "",
+                            description: data["description"] as? String ?? "",
+                            logoURL: data["logoURL"] as? String ?? "",
+                            members: data["memberIds"] as? [String] ?? [],
+                            events: data["eventIds"] as? [String] ?? [],
+                            socialMedia: data["socialMedia"] as? [String: String] ?? [:],
+                            leaderID: data["leaderId"] as? String ?? "",
+                            isActive: data["isActive"] as? Bool ?? true
+                        )
+                    }
+                } else {
+                    popularClubs = []
+                }
+            }
+        }
     }
 }
 
@@ -469,6 +538,47 @@ struct UpcomingEventCard: View {
             withAnimation(Animation.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
                 isAnimating = true
             }
+        }
+    }
+}
+
+// ClubManagerSelectorView: Birden fazla kulüp yöneticiliği için seçim ekranı
+struct ClubManagerSelectorView: View {
+    let leaderClubs: [Club]
+    @State private var selectedClub: Club? = nil
+    
+    var body: some View {
+        NavigationView {
+            List(leaderClubs) { club in
+                Button(action: {
+                    selectedClub = club
+                }) {
+                    HStack {
+                        AsyncImage(url: URL(string: club.logoURL)) { image in
+                            image.resizable().aspectRatio(contentMode: .fill)
+                        } placeholder: {
+                            Color.gray.opacity(0.3)
+                        }
+                        .frame(width: 50, height: 50)
+                        .clipShape(Circle())
+                        VStack(alignment: .leading) {
+                            Text(club.name).font(.headline)
+                            Text(club.description).font(.subheadline).lineLimit(1)
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Yönetici Olduğun Kulüpler")
+            .background(
+                NavigationLink(
+                    destination: selectedClub.map { ClubManagementView(club: $0) },
+                    isActive: Binding(
+                        get: { selectedClub != nil },
+                        set: { if !$0 { selectedClub = nil } }
+                    )
+                ) { EmptyView() }
+                .hidden()
+            )
         }
     }
 }

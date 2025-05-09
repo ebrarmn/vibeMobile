@@ -1,4 +1,5 @@
 import SwiftUI
+import FirebaseFirestore
 
 struct ClubListView: View {
     @StateObject private var theme = Theme.shared
@@ -329,31 +330,35 @@ struct ClubListView: View {
     
     private func loadClubs() async {
         isLoading = true
-        // Örnek veriler
-        clubs = [
-            Club(id: "1", 
-                 name: "Yazılım Kulübü",
-                 description: "Yazılım geliştirme ve teknoloji odaklı öğrenci kulübü",
-                 logoURL: "https://example.com/logo1.png",
-                 members: ["user1", "user2", "user3", "user4", "user5"],
-                 events: ["event1", "event2", "event3"],
-                 socialMedia: ["twitter": "@yazilimkulubu"]),
-            Club(id: "2",
-                 name: "Tiyatro Kulübü",
-                 description: "Sahne sanatları ve tiyatro etkinlikleri düzenleyen kulüp",
-                 logoURL: "https://example.com/logo2.png",
-                 members: ["user3", "user4", "user5", "user6"],
-                 events: ["event3", "event4"],
-                 socialMedia: ["instagram": "@tiyatrokulubu"]),
-            Club(id: "3",
-                 name: "Spor Kulübü",
-                 description: "Spor etkinlikleri ve turnuvalar düzenleyen kulüp",
-                 logoURL: "https://example.com/logo3.png",
-                 members: ["user7", "user8", "user9"],
-                 events: ["event5", "event6", "event7"],
-                 socialMedia: ["instagram": "@sporkulubu"]),
-        ]
-        isLoading = false
+        let db: Firestore = Firestore.firestore()
+        db.collection("clubs").getDocuments { snapshot, error in
+            DispatchQueue.main.async {
+                isLoading = false
+                if let error = error {
+                    print("Kulüpler çekilemedi: \(error.localizedDescription)")
+                    clubs = []
+                    return
+                }
+                guard let documents = snapshot?.documents else {
+                    clubs = []
+                    return
+                }
+                clubs = documents.compactMap { doc in
+                    let data = doc.data()
+                    return Club(
+                        id: doc.documentID,
+                        name: data["name"] as? String ?? "",
+                        description: data["description"] as? String ?? "",
+                        logoURL: data["logoURL"] as? String ?? "",
+                        members: data["memberIds"] as? [String] ?? [],
+                        events: data["eventIds"] as? [String] ?? [],
+                        socialMedia: data["socialMedia"] as? [String: String] ?? [:],
+                        leaderID: data["leaderId"] as? String ?? "",
+                        isActive: data["isActive"] as? Bool ?? true
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -573,7 +578,9 @@ struct ClubRow_Previews: PreviewProvider {
             logoURL: "https://example.com/logo.png",
             members: ["user1", "user2"],
             events: ["event1"],
-            socialMedia: ["twitter": "@ornekkulup"]
+            socialMedia: ["twitter": "@ornekkulup"],
+            leaderID: "leader1",
+            isActive: true
         ))
         .previewLayout(.sizeThatFits)
         .padding()
@@ -594,8 +601,156 @@ struct ClubDetailView_Previews: PreviewProvider {
                     "twitter": "@ornekkulup",
                     "instagram": "@ornekkulup",
                     "facebook": "ornekkulup"
-                ]
+                ],
+                leaderID: "leader1",
+                isActive: true
             ))
+        }
+    }
+}
+
+struct ClubManagementView: View {
+    @State private var club: Club
+    @State private var showingEventCreation = false
+    @State private var showingClubEdit = false
+    @State private var newEventName = ""
+    @State private var newEventDescription = ""
+    @State private var newEventDate = Date()
+    
+    init(club: Club) {
+        _club = State(initialValue: club)
+    }
+    
+    var body: some View {
+        NavigationView {
+            List {
+                Section(header: Text("Kulüp Bilgileri")) {
+                    HStack {
+                        Text("Kulüp Adı:")
+                        Spacer()
+                        Text(club.name)
+                    }
+                    
+                    HStack {
+                        Text("Açıklama:")
+                        Spacer()
+                        Text(club.description)
+                    }
+                    
+                    Button(action: {
+                        showingClubEdit = true
+                    }) {
+                        Text("Kulüp Bilgilerini Düzenle")
+                            .foregroundColor(.blue)
+                    }
+                }
+                
+                Section(header: Text("Etkinlikler")) {
+                    ForEach(club.events, id: \.self) { eventId in
+                        // Burada Event modelini kullanarak etkinlik detaylarını gösterebiliriz
+                        Text(eventId)
+                    }
+                    
+                    Button(action: {
+                        showingEventCreation = true
+                    }) {
+                        Text("Yeni Etkinlik Ekle")
+                            .foregroundColor(.blue)
+                    }
+                }
+            }
+            .navigationTitle("Kulüp Yönetimi")
+            .sheet(isPresented: $showingEventCreation) {
+                EventCreationView(club: club)
+            }
+            .sheet(isPresented: $showingClubEdit) {
+                ClubEditView(club: club)
+            }
+        }
+    }
+}
+
+struct EventCreationView: View {
+    let club: Club
+    @Environment(\.presentationMode) var presentationMode
+    @State private var eventName = ""
+    @State private var eventDescription = ""
+    @State private var eventDate = Date()
+    
+    var body: some View {
+        NavigationView {
+            Form {
+                TextField("Etkinlik Adı", text: $eventName)
+                TextField("Etkinlik Açıklaması", text: $eventDescription)
+                DatePicker("Tarih", selection: $eventDate, displayedComponents: [.date, .hourAndMinute])
+                
+                Button("Etkinlik Oluştur") {
+                    let db = Firestore.firestore()
+                    let newEventRef = db.collection("events").document()
+                    let eventData: [String: Any] = [
+                        "title": eventName,
+                        "description": eventDescription,
+                        "startDate": Timestamp(date: eventDate),
+                        "clubId": club.id,
+                        "location": "",
+                        "imageURL": "",
+                        "attendeeIds": [],
+                        "category": "all"
+                    ]
+                    newEventRef.setData(eventData) { error in
+                        if error == nil {
+                            let clubRef = db.collection("clubs").document(club.id)
+                            clubRef.updateData([
+                                "eventIds": FieldValue.arrayUnion([newEventRef.documentID])
+                            ])
+                        }
+                        presentationMode.wrappedValue.dismiss()
+                    }
+                }
+                .disabled(eventName.isEmpty || eventDescription.isEmpty)
+            }
+            .navigationTitle("Yeni Etkinlik")
+            .navigationBarItems(trailing: Button("İptal") {
+                presentationMode.wrappedValue.dismiss()
+            })
+        }
+    }
+}
+
+struct ClubEditView: View {
+    let club: Club
+    @Environment(\.presentationMode) var presentationMode
+    @State private var clubName: String
+    @State private var clubDescription: String
+    
+    init(club: Club) {
+        self.club = club
+        _clubName = State(initialValue: club.name)
+        _clubDescription = State(initialValue: club.description)
+    }
+    
+    var body: some View {
+        NavigationView {
+            Form {
+                TextField("Kulüp Adı", text: $clubName)
+                TextField("Kulüp Açıklaması", text: $clubDescription)
+                
+                Button("Değişiklikleri Kaydet") {
+                    let db = Firestore.firestore()
+                    let clubRef = db.collection("clubs").document(club.id)
+                    clubRef.updateData([
+                        "name": clubName,
+                        "description": clubDescription
+                    ]) { error in
+                        presentationMode.wrappedValue.dismiss()
+                    }
+                }
+                .disabled(clubName.isEmpty || clubDescription.isEmpty)
+            }
+            .navigationTitle("Kulüp Düzenle")
+            .navigationBarItems(trailing: Button("İptal") {
+                presentationMode.wrappedValue.dismiss()
+            })
         }
     }
 } 
