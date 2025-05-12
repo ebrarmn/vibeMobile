@@ -6,6 +6,7 @@ import FirebaseFirestore
 //ZStack:üst üste (z-ekseni boyunca) bileşen yerleştirir.
 struct HomeView: View {
     @StateObject private var theme = Theme.shared
+    @ObservedObject private var userSession = UserSession.shared
     //@StateObject:Karmaşık sınıf tabanlı tabanlı verileri yönetmek için görünümde oluşturulan ve sahip olunan bir ObservableObject'i tanımlar.
     //@State yerel bir veri saklamak için kullanılır
     @State private var isAnimating = false
@@ -28,7 +29,7 @@ struct HomeView: View {
                     Label("Kulüpler", systemImage: "person.3")
                 }
             
-            if let currentUser = UserSession.shared.currentUser {
+            if let currentUser = userSession.currentUser {
                 let leaderClubs = userClubs.filter { $0.leaderID == currentUser.id }
                 if leaderClubs.count == 1 {
                     ClubManagementView(club: leaderClubs[0])
@@ -45,9 +46,20 @@ struct HomeView: View {
             
             ProfileView()
                 .tabItem {
-                    Label("Profil", systemImage: "person")
+                    if let user = userSession.currentUser {
+                        VStack {
+                            TabBarProfileImageView(url: user.photoURL, size: 28, id: user.photoURL)
+                            Text("Profil")
+                        }
+                    } else {
+                        VStack {
+                            Image(systemName: "person")
+                            Text("Profil")
+                        }
+                    }
                 }
         }
+        .id(userSession.currentUser?.photoURL ?? "default")
         .accentColor(theme.primaryColor)
         .onAppear {
             loadUserClubs()
@@ -55,7 +67,7 @@ struct HomeView: View {
     }
     
     private func loadUserClubs() {
-        guard let currentUser = UserSession.shared.currentUser else { return }
+        guard let currentUser = userSession.currentUser else { return }
         
         let db = Firestore.firestore()
         db.collection("clubs")
@@ -579,6 +591,36 @@ struct ClubManagerSelectorView: View {
                 ) { EmptyView() }
                 .hidden()
             )
+        }
+    }
+}
+
+// TabBar'da profil fotoğrafı göstermek için küçük bir view
+struct TabBarProfileImageView: View {
+    let url: String
+    let size: CGFloat
+    let id: String
+
+    var body: some View {
+        if let imageURL = URL(string: url), !url.isEmpty {
+            AsyncImage(url: imageURL) { image in
+                image.resizable()
+            } placeholder: {
+                Image(systemName: "person.crop.circle.fill")
+                    .resizable()
+                    .foregroundColor(.gray)
+            }
+            .aspectRatio(contentMode: .fill)
+            .frame(width: size, height: size)
+            .clipShape(Circle())
+            .id(id)
+        } else {
+            Image(systemName: "person.crop.circle.fill")
+                .resizable()
+                .foregroundColor(.gray)
+                .frame(width: size, height: size)
+                .clipShape(Circle())
+                .id(id)
         }
     }
 }

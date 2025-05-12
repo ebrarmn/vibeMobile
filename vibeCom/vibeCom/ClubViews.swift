@@ -397,6 +397,7 @@ struct ClubDetailView: View {
     let club: Club
     @State private var isAnimating = false
     @ObservedObject private var userSession = UserSession.shared
+    @State private var clubEvents: [Event] = []
     
     var body: some View {
         ScrollView {
@@ -504,12 +505,19 @@ struct ClubDetailView: View {
                             .font(.title2)
                                 .fontWeight(.bold)
                         
-                        ForEach(club.events, id: \.self) { eventId in
+                            ForEach(clubEvents) { event in
+                                NavigationLink(destination: EventDetailView(event: event)) {
                             HStack {
                                 Image(systemName: "calendar")
                                         .foregroundColor(theme.primaryColor)
-                                Text(eventId)
+                                        VStack(alignment: .leading) {
+                                            Text(event.title)
+                                                .font(.headline)
                                         .foregroundColor(theme.textColor)
+                                            Text(event.date, style: .date)
+                                                .font(.caption)
+                                                .foregroundColor(theme.secondaryTextColor)
+                                        }
                                     Spacer()
                                     Image(systemName: "chevron.right")
                                         .foregroundColor(theme.secondaryTextColor)
@@ -517,11 +525,31 @@ struct ClubDetailView: View {
                             .padding()
                                 .background(theme.cardBackgroundColor)
                                 .cornerRadius(15)
+                                }
                             }
                         }
                     }
                     
                     // Katıl Butonu
+                    if UserSession.shared.currentUser?.id == club.leaderID {
+                        // Başkan için özel mesaj
+                        HStack {
+                            Image(systemName: "crown.fill")
+                                .foregroundColor(.yellow)
+                            Text("Siz bu kulübün başkanısınız")
+                                .font(.headline)
+                                .foregroundColor(theme.textColor)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.yellow.opacity(0.1))
+                        .cornerRadius(15)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 15)
+                                .stroke(Color.yellow.opacity(0.3), lineWidth: 1)
+                        )
+                    } else {
+                        // Normal üyeler için katıl/ayrıl butonu
                     Button(action: {
                         withAnimation {
                             if userSession.joinedClubs.contains(club.id) {
@@ -538,6 +566,7 @@ struct ClubDetailView: View {
                             .padding()
                             .background(userSession.joinedClubs.contains(club.id) ? Color.red : theme.primaryColor)
                             .cornerRadius(15)
+                        }
                     }
                 }
                 .padding()
@@ -548,6 +577,37 @@ struct ClubDetailView: View {
         .onAppear {
             withAnimation {
                 isAnimating = true
+            }
+            loadClubEvents()
+        }
+    }
+    
+    private func loadClubEvents() {
+        let db = Firestore.firestore()
+        let eventIds = club.events
+        
+        for eventId in eventIds {
+            db.collection("events").document(eventId).getDocument { snapshot, error in
+                if let data = snapshot?.data() {
+                    let categoryRaw = data["category"] as? String ?? "all"
+                    let category = EventCategory(rawValue: categoryRaw) ?? .all
+                    let event = Event(
+                        id: eventId,
+                        title: data["title"] as? String ?? "",
+                        description: data["description"] as? String ?? "",
+                        date: (data["startDate"] as? Timestamp)?.dateValue() ?? Date(),
+                        location: data["location"] as? String ?? "",
+                        clubId: data["clubId"] as? String ?? "",
+                        imageURL: data["imageURL"] as? String ?? "",
+                        attendees: data["attendeeIds"] as? [String] ?? [],
+                        category: category
+                    )
+                    DispatchQueue.main.async {
+                        if !clubEvents.contains(where: { $0.id == event.id }) {
+                            clubEvents.append(event)
+                        }
+                    }
+                }
             }
         }
     }
@@ -616,6 +676,8 @@ struct ClubManagementView: View {
     @State private var newEventName = ""
     @State private var newEventDescription = ""
     @State private var newEventDate = Date()
+    @State private var showingDeleteAlert = false
+    @State private var isDeleting = false
     
     init(club: Club) {
         _club = State(initialValue: club)
@@ -643,6 +705,16 @@ struct ClubManagementView: View {
                         Text("Kulüp Bilgilerini Düzenle")
                             .foregroundColor(.blue)
                     }
+                    // Kulübü Dağıt butonu (sadece başkan görür)
+                    if UserSession.shared.currentUser?.id == club.leaderID {
+                        Button(role: .destructive, action: {
+                            showingDeleteAlert = true
+                        }) {
+                            Text("Kulübü Dağıt")
+                                .foregroundColor(.red)
+                        }
+                        .disabled(isDeleting)
+                    }
                 }
                 
                 Section(header: Text("Etkinlikler")) {
@@ -665,6 +737,35 @@ struct ClubManagementView: View {
             }
             .sheet(isPresented: $showingClubEdit) {
                 ClubEditView(club: club)
+            }
+            .alert("Kulübü silmek istediğinizden emin misiniz?", isPresented: $showingDeleteAlert) {
+                Button("İptal", role: .cancel) {}
+                Button("Evet, Sil", role: .destructive) {
+                    deleteClubAndEvents(club: club)
+                }
+            } message: {
+                Text("Bu işlem geri alınamaz. Kulüp ve tüm etkinlikleri silinecek.")
+            }
+        }
+    }
+    
+    private func deleteClubAndEvents(club: Club) {
+        isDeleting = true
+        let db: Firestore = Firestore.firestore()
+        // Önce kulübe ait etkinlikleri sil
+        let eventIds: [String] = club.events
+        let group = DispatchGroup()
+        for eventId in eventIds {
+            group.enter()
+            db.collection("events").document(eventId).delete { _ in
+                group.leave()
+            }
+        }
+        group.notify(queue: .main) {
+            // Sonra kulübü sil
+            db.collection("clubs").document(club.id).delete { _ in
+                isDeleting = false
+                // İsteğe bağlı: Kullanıcıyı ana ekrana yönlendir
             }
         }
     }

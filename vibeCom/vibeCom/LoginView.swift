@@ -1,6 +1,7 @@
 import SwiftUI
 import FirebaseAuth
 import FirebaseFirestore
+import FirebaseStorage
 
 struct LoginView: View {
     @StateObject private var theme = Theme.shared
@@ -192,7 +193,7 @@ struct LoginView: View {
                     return
                 }
                 if let data = snapshot?.data() {
-                    // Kullanıcı verisi bulundu, normal akış
+                    // Firestore'dan gelen güncel kullanıcı verisiyle UserSession'ı güncelle
                     isLoading = false
                     let appUser = AppUser(
                         id: user.uid,
@@ -205,6 +206,7 @@ struct LoginView: View {
                         updatedAt: (data["updatedAt"] as? Timestamp)?.dateValue()
                     )
                     UserSession.shared.currentUser = appUser
+                    // Girişten sonra başka yerde eski AppUser ile overwrite etme!
                 } else {
                     // Kullanıcı verisi yok, otomatik oluştur
                     let now: Timestamp = Timestamp(date: Date())

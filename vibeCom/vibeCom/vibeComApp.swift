@@ -45,6 +45,9 @@ struct RootView: View {
             }
         } else {
             HomeView()
+                .onAppear {
+                    UserSession.shared.fetchUserDataFromFirestore()
+                }
         }
     }
 }

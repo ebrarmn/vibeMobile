@@ -1,6 +1,70 @@
 import SwiftUI
 import FirebaseAuth
 import FirebaseFirestore
+import FirebaseStorage
+
+#if os(iOS)
+import UIKit
+struct CustomImagePicker: UIViewControllerRepresentable {
+    @Binding var selectedImage: UIImage?
+    @Environment(\.presentationMode) private var presentationMode
+    
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let picker = UIImagePickerController()
+        picker.delegate = context.coordinator
+        picker.sourceType = .photoLibrary
+        return picker
+    }
+    
+    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+    
+    class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+        let parent: CustomImagePicker
+        
+        init(_ parent: CustomImagePicker) {
+            self.parent = parent
+        }
+        
+        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
+            if let image = info[.originalImage] as? UIImage {
+                parent.selectedImage = image
+            }
+            parent.presentationMode.wrappedValue.dismiss()
+        }
+        
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+            parent.presentationMode.wrappedValue.dismiss()
+        }
+    }
+}
+#elseif os(macOS)
+import AppKit
+struct CustomImagePicker: NSViewControllerRepresentable {
+    @Binding var selectedImage: UIImage?
+    
+    func makeNSViewController(context: Context) -> NSViewController {
+        let viewController = NSViewController()
+        DispatchQueue.main.async {
+            let panel = NSOpenPanel()
+            panel.allowedFileTypes = ["png", "jpg", "jpeg", "heic"]
+            panel.allowsMultipleSelection = false
+            panel.canChooseDirectories = false
+            if panel.runModal() == .OK, let url = panel.url, let nsImage = NSImage(contentsOf: url) {
+                let rep = NSBitmapImageRep(data: nsImage.tiffRepresentation!)
+                if let data = rep?.representation(using: .jpeg, properties: [:]), let uiImage = UIImage(data: data) {
+                    selectedImage = uiImage
+                }
+            }
+        }
+        return viewController
+    }
+    func updateNSViewController(_ nsViewController: NSViewController, context: Context) {}
+}
+#endif
 
 struct ProfileView: View {
     @StateObject private var theme = Theme.shared
@@ -49,6 +113,14 @@ struct ProfileView: View {
                 }
                 .onAppear {
                     loadUserClubs()
+                    loadUserAttendingEvents()
+                    loadAllEvents()
+                    // Kullanıcı ID'sini debug konsoluna yazdır
+                    if let userId = userSession.currentUser?.id {
+                        print("[DEBUG] Uygulamadaki user.id: \(userId)")
+                    } else {
+                        print("[DEBUG] Uygulamadaki user.id: nil")
+                    }
                 }
             } else {
                 ProgressView()
@@ -120,7 +192,7 @@ struct ProfileView: View {
                 }
             }
         }
-        .sheet(isPresented: $showingImagePicker) {
+        .sheet(isPresented: $showingImagePicker, onDismiss: uploadProfileImage) {
             CustomImagePicker(selectedImage: $selectedImage)
         }
     }
@@ -139,12 +211,6 @@ struct ProfileView: View {
                                 Text(user.email)
                                     .font(.subheadline)
                                     .foregroundColor(theme.secondaryTextColor)
-                                HStack(spacing: 20) {
-                    profileStatView(title: "Kulüp", value: "\(user.clubIds.count)", delay: 0.1)
-                    Divider().frame(height: 30)
-                    profileStatView(title: "Etkinlik", value: "-", delay: 0.2)
-                                }
-                                .padding(.top, 10)
                             }
                         }
                         .padding()
@@ -182,13 +248,11 @@ struct ProfileView: View {
                             // Kulüpler
                             VStack(alignment: .leading, spacing: 15) {
                                 HStack {
-                                    Text("Katıldığım Kulüpler")
+                    Text("Kulüplerim")
                                         .font(.title2)
                                         .fontWeight(.bold)
                                         .padding(.horizontal)
-                                    
                                     Spacer()
-                                    
                                     Image(systemName: "person.3.fill")
                                         .foregroundColor(theme.primaryColor)
                                         .rotationEffect(.degrees(isAnimating ? 360 : 0))
@@ -198,31 +262,29 @@ struct ProfileView: View {
                                             value: isAnimating
                                         )
                                 }
-                                
-                                // Katıldığı kulüplerin isimlerini bul
-                                let joinedClubNames = userSession.joinedClubs.compactMap { clubId in
-                                    allClubs.first(where: { $0.id == clubId })
-                                }
+                // Başkan olduğu kulüpler
+                let leaderClubs = allClubs.filter { $0.leaderID == userSession.currentUser?.id }
+                if !leaderClubs.isEmpty {
+                    Text("Başkan Olduğum Kulüpler")
+                        .font(.headline)
+                        .padding(.horizontal)
                                 ScrollView(.horizontal, showsIndicators: false) {
                                     HStack(spacing: 15) {
-                                        ForEach(Array(joinedClubNames.enumerated()), id: \.element.id) { index, club in
+                            ForEach(leaderClubs) { club in
                                             NavigationLink(destination: ClubDetailView(club: club)) {
                                                 VStack(spacing: 10) {
                                                     Image(systemName: "person.3.fill")
                                                         .font(.system(size: 30))
-                                                        .foregroundColor(club.leaderID == userSession.currentUser?.id ? .purple : .blue)
+                                                        .foregroundColor(.purple)
                                                         .frame(width: 60, height: 60)
-                                                        .background((club.leaderID == userSession.currentUser?.id ? Color.purple : Color.blue).opacity(0.1))
-                                                        .clipShape(Circle())
-                                                    
+                                                        .background(Color.purple.opacity(0.1))
                                                     Text(club.name)
                                                         .font(.subheadline)
                                                         .fontWeight(.medium)
                                                         .lineLimit(1)
-                                                    
-                                                    Text(club.leaderID == userSession.currentUser?.id ? "Başkan" : "Üye")
-                                                        .font(.caption)
-                                                        .foregroundColor(club.leaderID == userSession.currentUser?.id ? .purple : .blue)
+                                        Text("Başkan")
+                                            .font(.caption)
+                                            .foregroundColor(.purple)
                                                 }
                                                 .frame(width: 100)
                                                 .padding()
@@ -239,16 +301,57 @@ struct ProfileView: View {
                                                     RoundedRectangle(cornerRadius: 15)
                                                         .stroke(theme.primaryColor.opacity(0.3), lineWidth: 1)
                                                 )
-                                                .scaleEffect(isAnimating ? 1.0 : 0.9)
-                                                .animation(
-                                                    Animation.spring(response: 0.5, dampingFraction: 0.6)
-                                                        .delay(Double(index) * 0.1),
-                                                    value: isAnimating
+                                }
+                            }
+                        }
+                        .padding(.horizontal)
+                    }
+                }
+                // Üye olduğu kulüpler
+                let memberClubs = allClubs.filter { $0.leaderID != userSession.currentUser?.id }
+                if !memberClubs.isEmpty {
+                    Text("Katıldığım Kulüpler")
+                        .font(.headline)
+                        .padding(.horizontal)
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 15) {
+                            ForEach(memberClubs) { club in
+                                NavigationLink(destination: ClubDetailView(club: club)) {
+                                    VStack(spacing: 10) {
+                                        Image(systemName: "person.3.fill")
+                                            .font(.system(size: 30))
+                                            .foregroundColor(.blue)
+                                            .frame(width: 60, height: 60)
+                                            .background(Color.blue.opacity(0.1))
+                                            .clipShape(Circle())
+                                        Text(club.name)
+                                            .font(.subheadline)
+                                            .fontWeight(.medium)
+                                            .lineLimit(1)
+                                        Text("Üye")
+                                            .font(.caption)
+                                            .foregroundColor(.blue)
+                                    }
+                                    .frame(width: 100)
+                                    .padding()
+                                    .background(
+                                        LinearGradient(
+                                            colors: [theme.cardBackgroundColor, theme.cardBackgroundColor.opacity(0.8)],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                    .cornerRadius(15)
+                                    .shadow(radius: 3)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 15)
+                                            .stroke(theme.primaryColor.opacity(0.3), lineWidth: 1)
                                                 )
                                             }
                                         }
                                     }
                                     .padding(.horizontal)
+                    }
                                 }
                             }
         case 1:
@@ -272,12 +375,12 @@ struct ProfileView: View {
                                         )
                                 }
                                 
-                                // Katıldığı etkinliklerin isimlerini bul
-                                let attendingEventNames = userSession.attendingEvents.compactMap { eventId in
-                                    allEvents.first(where: { $0.id == eventId })
+                                // Katıldığı ve tarihi geçmemiş etkinlikler
+                                let upcomingAttendingEvents = userSession.attendingEvents.compactMap { eventId in
+                                    allEvents.first(where: { $0.id == eventId && $0.date >= Date() })
                                 }
                                 VStack(spacing: 15) {
-                                    ForEach(Array(attendingEventNames.enumerated()), id: \.element.id) { index, event in
+                                    ForEach(Array(upcomingAttendingEvents.enumerated()), id: \.element.id) { index, event in
                                         NavigationLink(destination: EventDetailView(event: event)) {
                                             HStack(spacing: 15) {
                                                 Image(systemName: "calendar")
@@ -297,6 +400,63 @@ struct ProfileView: View {
                                                 
                                                 Spacer()
                                                 
+                                                Image(systemName: "chevron.right")
+                                                    .foregroundColor(.secondary)
+                                            }
+                                            .padding()
+                                            .background(
+                                                LinearGradient(
+                                                    colors: [theme.cardBackgroundColor, theme.cardBackgroundColor.opacity(0.8)],
+                                                    startPoint: .topLeading,
+                                                    endPoint: .bottomTrailing
+                                                )
+                                            )
+                                            .cornerRadius(15)
+                                            .shadow(radius: 3)
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 15)
+                                                    .stroke(theme.primaryColor.opacity(0.3), lineWidth: 1)
+                                            )
+                                            .scaleEffect(isAnimating ? 1.0 : 0.95)
+                                            .opacity(isAnimating ? 1.0 : 0.0)
+                                            .animation(
+                                                Animation.spring(response: 0.5, dampingFraction: 0.6)
+                                                    .delay(Double(index) * 0.1),
+                                                value: isAnimating
+                                            )
+                                        }
+                                    }
+                                }
+                                .padding(.horizontal)
+                                // Geçmişte katıldığı etkinlikler
+                                HStack {
+                                    Text("Geçmişte Katıldığım Etkinlikler")
+                                        .font(.title3)
+                                        .fontWeight(.semibold)
+                                        .padding(.horizontal)
+                                    Spacer()
+                                }
+                                let pastAttendingEvents = userSession.attendingEvents.compactMap { eventId in
+                                    allEvents.first(where: { $0.id == eventId && $0.date < Date() })
+                                }
+                                VStack(spacing: 15) {
+                                    ForEach(Array(pastAttendingEvents.enumerated()), id: \.element.id) { index, event in
+                                        NavigationLink(destination: EventDetailView(event: event)) {
+                                            HStack(spacing: 15) {
+                                                Image(systemName: "calendar")
+                                                    .font(.title2)
+                                                    .foregroundColor(.gray)
+                                                    .frame(width: 40, height: 40)
+                                                    .background(Color.gray.opacity(0.1))
+                                                    .clipShape(Circle())
+                                                VStack(alignment: .leading, spacing: 4) {
+                                                    Text(event.title)
+                                                        .font(.headline)
+                                                    Text("Geçmiş Etkinlik")
+                                                        .font(.caption)
+                                                        .foregroundColor(.secondary)
+                                                }
+                                                Spacer()
                                                 Image(systemName: "chevron.right")
                                                     .foregroundColor(.secondary)
                                             }
@@ -684,10 +844,39 @@ struct ProfileView: View {
     
     @ViewBuilder
     private func profileImageView(url: String) -> some View {
+        if let selectedImage = selectedImage {
+            Image(uiImage: selectedImage)
+                .resizable()
+                .scaledToFill()
+                .frame(width: 120, height: 120)
+                .clipShape(Circle())
+                .overlay(
+                    Circle().stroke(
+                        LinearGradient(
+                            colors: [theme.primaryColor, theme.primaryColor.opacity(0.7)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 3
+                    )
+                )
+                .overlay(
+                    Circle()
+                        .fill(Color.black.opacity(0.3))
+                        .overlay(
+                            Image(systemName: "camera.fill")
+                                .foregroundColor(.white)
+                        )
+                        .opacity(isAnimating ? 1 : 0)
+                )
+                .shadow(radius: 10)
+                .scaleEffect(isAnimating ? 1.0 : 0.9)
+                .animation(.spring(response: 0.5, dampingFraction: 0.6), value: isAnimating)
+        } else {
         AsyncImage(url: URL(string: url)) { image in
             image
                 .resizable()
-                .aspectRatio(contentMode: .fill)
+                .scaledToFill()
         } placeholder: {
             Image(systemName: "person.circle.fill")
                 .resizable()
@@ -696,15 +885,14 @@ struct ProfileView: View {
         .frame(width: 120, height: 120)
         .clipShape(Circle())
         .overlay(
-            Circle()
-                .stroke(
-                    LinearGradient(
-                        colors: [theme.primaryColor, theme.primaryColor.opacity(0.7)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 3
-                )
+            Circle().stroke(
+                LinearGradient(
+                    colors: [theme.primaryColor, theme.primaryColor.opacity(0.7)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ),
+                lineWidth: 3
+            )
         )
         .overlay(
             Circle()
@@ -718,6 +906,7 @@ struct ProfileView: View {
         .shadow(radius: 10)
         .scaleEffect(isAnimating ? 1.0 : 0.9)
         .animation(.spring(response: 0.5, dampingFraction: 0.6), value: isAnimating)
+        }
     }
     
     @ViewBuilder
@@ -786,6 +975,86 @@ struct ProfileView: View {
                     }
                 }
             }
+    }
+    
+    private func loadUserAttendingEvents() {
+        guard let userId = userSession.currentUser?.id else { return }
+        let db = Firestore.firestore()
+        db.collection("users").document(userId).getDocument { snapshot, error in
+            if let data = snapshot?.data(), let eventIds = data["attendingEvents"] as? [String] {
+                DispatchQueue.main.async {
+                    userSession.attendingEvents = eventIds
+                }
+            }
+        }
+    }
+    
+    private func loadAllEvents() {
+        let db = Firestore.firestore()
+        db.collection("events").getDocuments { snapshot, error in
+            if let documents = snapshot?.documents {
+                let events = documents.compactMap { doc -> Event? in
+                    let data = doc.data()
+                    let categoryRaw = data["category"] as? String ?? "all"
+                    let category = EventCategory(rawValue: categoryRaw) ?? .all
+                    return Event(
+                        id: doc.documentID,
+                        title: data["title"] as? String ?? "",
+                        description: data["description"] as? String ?? "",
+                        date: (data["startDate"] as? Timestamp)?.dateValue() ?? Date(),
+                        location: data["location"] as? String ?? "",
+                        clubId: data["clubId"] as? String ?? "",
+                        imageURL: data["imageURL"] as? String ?? "",
+                        attendees: data["attendeeIds"] as? [String] ?? [],
+                        category: category
+                    )
+                }
+                DispatchQueue.main.async {
+                    allEvents = events
+                }
+            }
+        }
+    }
+    
+    private func uploadProfileImage() {
+        print("Profil fotoğrafı yükleniyor...")
+        guard let image = selectedImage, let user = userSession.currentUser else { print("Seçili resim veya kullanıcı yok"); return }
+        guard let imageData = image.jpegData(compressionQuality: 0.8) else { print("Resim verisi alınamadı"); return }
+        let storageRef = Storage.storage().reference().child("profileImages/")
+            .child("\(user.id).jpg")
+        storageRef.putData(imageData, metadata: nil) { metadata, error in
+            if let error = error {
+                print("Storage'a yüklenemedi: \(error.localizedDescription)")
+                return
+            }
+            print("Storage'a yüklendi!")
+            storageRef.downloadURL { url, error in
+                if let error = error {
+                    print("Download URL alınamadı: \(error.localizedDescription)")
+                    return
+                }
+                guard let downloadURL = url else { print("Download URL yok"); return }
+                print("Download URL: \(downloadURL.absoluteString)")
+                // Firestore'da photoURL alanını updateData ile güncelle
+                let db = Firestore.firestore()
+                db.collection("users").document(user.id).updateData([
+                    "photoURL": downloadURL.absoluteString
+                ]) { error in
+                    if let error = error {
+                        print("Firestore'a photoURL update edilemedi: \(error.localizedDescription)")
+                    } else {
+                        print("Firestore'a photoURL update edildi! (Güncel Storage linki)")
+                    }
+                    // UserSession'da güncelle (Firestore'a yazılamasa bile localde güncel tut)
+                    DispatchQueue.main.async {
+                        var updatedUser = user
+                        updatedUser.photoURL = downloadURL.absoluteString
+                        userSession.currentUser = updatedUser
+                        print("UserSession güncellendi!")
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -882,44 +1151,6 @@ struct User {
 struct ProfileView_Previews: PreviewProvider {
     static var previews: some View {
         ProfileView()
-    }
-}
-
-// ImagePicker yapısı
-struct CustomImagePicker: UIViewControllerRepresentable {
-    @Binding var selectedImage: UIImage?
-    @Environment(\.presentationMode) private var presentationMode
-    
-    func makeUIViewController(context: Context) -> UIImagePickerController {
-        let picker = UIImagePickerController()
-        picker.delegate = context.coordinator
-        picker.sourceType = .photoLibrary
-        return picker
-    }
-    
-    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
-    
-    func makeCoordinator() -> Coordinator {
-        Coordinator(self)
-    }
-    
-    class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
-        let parent: CustomImagePicker
-        
-        init(_ parent: CustomImagePicker) {
-            self.parent = parent
-        }
-        
-        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
-            if let image = info[.originalImage] as? UIImage {
-                parent.selectedImage = image
-            }
-            parent.presentationMode.wrappedValue.dismiss()
-        }
-        
-        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
-            parent.presentationMode.wrappedValue.dismiss()
-        }
     }
 }
 

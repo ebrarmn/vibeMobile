@@ -98,7 +98,39 @@ struct EventsView: View {
                         }
                         
                         LazyVStack(spacing: 15) {
-                            ForEach(Array(filteredEvents.enumerated()), id: \.element.id) { index, event in
+                            ForEach(Array(upcomingEvents.enumerated()), id: \.element.id) { index, event in
+                                let clubName = clubs.first(where: { $0.id == event.clubId })?.name ?? "Bilinmeyen Kulüp"
+                                EventCard(event: event, clubName: clubName)
+                                    .padding(.horizontal)
+                                    .scaleEffect(isAnimating ? 1.0 : 0.95)
+                                    .opacity(isAnimating ? 1.0 : 0.0)
+                                    .animation(
+                                        Animation.spring(response: 0.5, dampingFraction: 0.6)
+                                            .delay(Double(index) * 0.1),
+                                        value: isAnimating
+                                    )
+                            }
+                        }
+                    }
+                    // Geçmiş etkinlikler
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Text("Geçmiş Etkinlikler")
+                                .font(.title2)
+                                .bold()
+                                .padding(.horizontal)
+                            Spacer()
+                            Image(systemName: "clock.arrow.circlepath")
+                                .foregroundColor(theme.primaryColor)
+                                .rotationEffect(.degrees(isAnimating ? 360 : 0))
+                                .animation(
+                                    Animation.linear(duration: 2)
+                                        .repeatForever(autoreverses: false),
+                                    value: isAnimating
+                                )
+                        }
+                        LazyVStack(spacing: 15) {
+                            ForEach(Array(pastEvents.enumerated()), id: \.element.id) { index, event in
                                 let clubName = clubs.first(where: { $0.id == event.clubId })?.name ?? "Bilinmeyen Kulüp"
                                 EventCard(event: event, clubName: clubName)
                                     .padding(.horizontal)
@@ -161,6 +193,16 @@ struct EventsView: View {
         }
         
         return filtered
+    }
+    
+    private var upcomingEvents: [Event] {
+        let now = Date()
+        return filteredEvents.filter { $0.date >= now }.sorted { $0.date < $1.date }
+    }
+    
+    private var pastEvents: [Event] {
+        let now = Date()
+        return filteredEvents.filter { $0.date < now }.sorted { $0.date > $1.date }
     }
     
     private func loadEvents() async {
@@ -284,6 +326,13 @@ struct EventDetailView: View {
     @State private var isAnimating = false
     @ObservedObject private var userSession = UserSession.shared
     
+    private var isUserClubMember: Bool {
+        userSession.joinedClubs.contains(event.clubId)
+    }
+    private var isEventPast: Bool {
+        event.date < Date()
+    }
+    
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
@@ -377,6 +426,17 @@ struct EventDetailView: View {
                     }
                     
                     // Katıl Butonu
+                    if isEventPast {
+                        Text("Etkinliğin zamanı geçti.")
+                            .font(.caption)
+                            .foregroundColor(.red)
+                            .padding(.bottom, 4)
+                    } else if !isUserClubMember {
+                        Text("Bu etkinliğe katılmak için önce kulübe üye olmalısınız.")
+                            .font(.caption)
+                            .foregroundColor(.red)
+                            .padding(.bottom, 4)
+                    }
                     Button(action: {
                         withAnimation {
                             if userSession.attendingEvents.contains(event.id) {
@@ -394,6 +454,7 @@ struct EventDetailView: View {
                             .background(userSession.attendingEvents.contains(event.id) ? Color.red : theme.primaryColor)
                             .cornerRadius(15)
                     }
+                    .disabled(!isUserClubMember || isEventPast)
                 }
                 .padding()
             }
@@ -483,22 +544,22 @@ struct WeeklyEventCard: View {
             }
             .frame(width: 200, height: 120)
                 .clipShape(RoundedRectangle(cornerRadius: 10))
-            VStack(alignment: .leading, spacing: 4) {
-                Text(event.title)
-                    .font(.headline)
-                    .lineLimit(1)
+                VStack(alignment: .leading, spacing: 4) {
+            Text(event.title)
+                .font(.headline)
+                .lineLimit(1)
                 Text("Düzenleyen: \(clubName)")
                     .font(.caption2)
                     .foregroundColor(.secondary)
-                Text(event.date.formatted(date: .abbreviated, time: .shortened))
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                Text(event.location)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .lineLimit(1)
-            }
-            .padding(.horizontal, 8)
+            Text(event.date.formatted(date: .abbreviated, time: .shortened))
+                .font(.caption)
+                .foregroundColor(.secondary)
+                    Text(event.location)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                }
+                .padding(.horizontal, 8)
         }
         .frame(width: 200)
             .background(Color(.systemBackground))
