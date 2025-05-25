@@ -16,6 +16,13 @@ struct RegisterView: View {
     @State private var isAnimating: Bool = false
     @State private var showResetAlert: Bool = false
     @State private var resetMessage: String = ""
+    @State private var faculty: String = ""
+    @State private var gender: String = ""
+    @State private var grade: String = ""
+    @State private var phone: String = ""
+    @State private var phoneError: String? = nil
+    @State private var university: String = ""
+    @State private var department: String = ""
     
     var body: some View {
         ScrollView {
@@ -35,6 +42,16 @@ struct RegisterView: View {
                         text: $name,
                         icon: "person.fill"
                     )
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Cinsiyet")
+                            .font(.headline)
+                        Picker("Cinsiyet", selection: $gender) {
+                            Text("Kız").tag("Kız")
+                            Text("Erkek").tag("Erkek")
+                            Text("Belirtmek İstemiyorum").tag("Belirtmek İstemiyorum")
+                        }
+                        .pickerStyle(SegmentedPickerStyle())
+                    }
                     LoginTextField(
                         title: "E-posta",
                         placeholder: "E-posta adresiniz",
@@ -55,6 +72,70 @@ struct RegisterView: View {
                         icon: "lock.fill",
                         isSecure: true
                     )
+                    LoginTextField(
+                        title: "Telefon",
+                        placeholder: "05XXXXXXXXX",
+                        text: Binding(
+                            get: { phone },
+                            set: { newValue in
+                                // Sadece rakamları al
+                                let filtered = newValue.filter { $0.isNumber }
+                                // Maksimum 11 karakter
+                                let limited = String(filtered.prefix(11))
+                                // Başında 0 yoksa ekle
+                                if !limited.isEmpty && !limited.hasPrefix("0") {
+                                    phone = "0" + limited.prefix(10)
+                                } else {
+                                    phone = limited
+                                }
+                                // Hata kontrolü
+                                if phone.count != 11 {
+                                    phoneError = "Telefon numarası 11 haneli olmalı."
+                                } else {
+                                    phoneError = nil
+                                }
+                            }
+                        ),
+                        icon: "phone.fill",
+                        keyboardType: .numberPad
+                    )
+                    if let phoneError = phoneError {
+                        Text(phoneError)
+                            .foregroundColor(.red)
+                            .font(.caption)
+                    }
+                    LoginTextField(
+                        title: "Üniversite",
+                        placeholder: "Üniversite adınız",
+                        text: $university,
+                        icon: "graduationcap"
+                    )
+                    LoginTextField(
+                        title: "Fakülte",
+                        placeholder: "Fakülte adınız",
+                        text: $faculty,
+                        icon: "building.columns"
+                    )
+                    LoginTextField(
+                        title: "Bölüm",
+                        placeholder: "Bölüm adınız",
+                        text: $department,
+                        icon: "book"
+                    )
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Sınıf")
+                            .font(.headline)
+                        Picker("Sınıf", selection: $grade) {
+                            Text("Hazırlık").tag("Hazırlık")
+                            Text("1").tag("1")
+                            Text("2").tag("2")
+                            Text("3").tag("3")
+                            Text("4").tag("4")
+                            Text("5").tag("5")
+                            Text("6").tag("6")
+                        }
+                        .pickerStyle(SegmentedPickerStyle())
+                    }
                     Button(action: register) {
                         HStack {
                             if isLoading {
@@ -146,7 +227,7 @@ struct RegisterView: View {
     }
     
     private var isFormValid: Bool {
-        !name.isEmpty && !email.isEmpty && !password.isEmpty && !confirmPassword.isEmpty && password == confirmPassword
+        !name.isEmpty && !email.isEmpty && !password.isEmpty && !confirmPassword.isEmpty && password == confirmPassword && !faculty.isEmpty && !gender.isEmpty && !grade.isEmpty && !phone.isEmpty && !university.isEmpty && !department.isEmpty && phone.count == 11 && phone.hasPrefix("0")
     }
     
     private func register() {
@@ -170,6 +251,12 @@ struct RegisterView: View {
             let userData: [String: Any] = [
                 "displayName": name,
                 "email": email,
+                "phone": phone,
+                "faculty": faculty,
+                "department": department,
+                "university": university,
+                "grade": grade,
+                "gender": gender,
                 "photoURL": "",
                 "role": "user",
                 "clubIds": [],
@@ -177,12 +264,12 @@ struct RegisterView: View {
                 "updatedAt": now
             ]
             Firestore.firestore().collection("users").document(user.uid).setData(userData) { error in
-            isLoading = false
+                isLoading = false
                 if let error = error {
                     errorMessage = error.localizedDescription
                     showError = true
                 } else {
-            dismiss()
+                    dismiss()
                 }
             }
         }

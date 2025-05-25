@@ -26,7 +26,8 @@ struct Event: Identifiable, Codable {
     let id: String
     let title: String
     let description: String
-    let date: Date
+    let startDate: Date
+    let endDate: Date
     let location: String
     let clubId: String
     let imageURL: String
@@ -37,7 +38,8 @@ struct Event: Identifiable, Codable {
         case id
         case title
         case description
-        case date
+        case startDate
+        case endDate
         case location
         case clubId = "club_id"
         case imageURL = "image_url"

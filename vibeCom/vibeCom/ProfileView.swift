@@ -73,10 +73,7 @@ struct ProfileView: View {
     @State private var allEvents: [Event] = []
     @State private var selectedTab = 0
     @State private var showingSettings = false
-    @State private var notificationsEnabled = true
     @State private var darkModeEnabled = false
-    @State private var emailNotifications = true
-    @State private var pushNotifications = true
     @State private var isAnimating = false
     @State private var selectedLanguage = "Türkçe"
     @State private var showLanguagePicker = false
@@ -88,6 +85,7 @@ struct ProfileView: View {
     @State private var showingAdminPanel = false
     @State private var showingLogoutAlert = false
     @State private var isLoggedOut = false
+    @State private var pendingInvitations: [ClubInvitation] = []
     
     var body: some View {
         NavigationView {
@@ -97,6 +95,57 @@ struct ProfileView: View {
                         profileHeader(user: user)
                         tabPicker(user: user)
                         tabContent(user: user)
+                        
+                        if !pendingInvitations.isEmpty {
+                            VStack(alignment: .leading, spacing: 10) {
+                                Text("Kulüp Davetleri")
+                                    .font(.headline)
+                                    .padding(.horizontal)
+                                
+                                ForEach(pendingInvitations) { invitation in
+                                    HStack {
+                                        VStack(alignment: .leading, spacing: 5) {
+                                            Text(invitation.clubName)
+                                                .font(.headline)
+                                            Text("\(invitation.senderName) tarafından davet edildiniz")
+                                                .font(.subheadline)
+                                                .foregroundColor(.gray)
+                                        }
+                                        
+                                        Spacer()
+                                        
+                                        HStack(spacing: 10) {
+                                            Button(action: {
+                                                acceptInvitation(invitation)
+                                            }) {
+                                                Text("Kabul Et")
+                                                    .foregroundColor(.white)
+                                                    .padding(.horizontal, 15)
+                                                    .padding(.vertical, 8)
+                                                    .background(Color.green)
+                                                    .cornerRadius(8)
+                                            }
+                                            
+                                            Button(action: {
+                                                rejectInvitation(invitation)
+                                            }) {
+                                                Text("Reddet")
+                                                    .foregroundColor(.white)
+                                                    .padding(.horizontal, 15)
+                                                    .padding(.vertical, 8)
+                                                    .background(Color.red)
+                                                    .cornerRadius(8)
+                                            }
+                                        }
+                                    }
+                                    .padding()
+                                    .background(Color.white)
+                                    .cornerRadius(10)
+                                    .shadow(radius: 2)
+                                    .padding(.horizontal)
+                                }
+                            }
+                        }
                     }
                     .padding(.vertical)
                 }
@@ -115,6 +164,7 @@ struct ProfileView: View {
                     loadUserClubs()
                     loadUserAttendingEvents()
                     loadAllEvents()
+                    loadPendingInvitations()
                     // Kullanıcı ID'sini debug konsoluna yazdır
                     if let userId = userSession.currentUser?.id {
                         print("[DEBUG] Uygulamadaki user.id: \(userId)")
@@ -377,7 +427,7 @@ struct ProfileView: View {
                                 
                                 // Katıldığı ve tarihi geçmemiş etkinlikler
                                 let upcomingAttendingEvents = userSession.attendingEvents.compactMap { eventId in
-                                    allEvents.first(where: { $0.id == eventId && $0.date >= Date() })
+                                    allEvents.first(where: { $0.id == eventId && $0.startDate >= Date() })
                                 }
                                 VStack(spacing: 15) {
                                     ForEach(Array(upcomingAttendingEvents.enumerated()), id: \.element.id) { index, event in
@@ -437,7 +487,7 @@ struct ProfileView: View {
                                     Spacer()
                                 }
                                 let pastAttendingEvents = userSession.attendingEvents.compactMap { eventId in
-                                    allEvents.first(where: { $0.id == eventId && $0.date < Date() })
+                                    allEvents.first(where: { $0.id == eventId && $0.endDate < Date() })
                                 }
                                 VStack(spacing: 15) {
                                     ForEach(Array(pastAttendingEvents.enumerated()), id: \.element.id) { index, event in
@@ -514,27 +564,6 @@ struct ProfileView: View {
                                     }
                                 }
                                 
-                                // Bildirim Ayarları
-                                SettingsSection(title: "Bildirim Ayarları") {
-                                    ToggleSettingsRow(
-                                        icon: "bell.fill",
-                                        title: "Bildirimler",
-                                        isOn: $notificationsEnabled
-                                    )
-                                    
-                                    ToggleSettingsRow(
-                                        icon: "envelope.fill",
-                                        title: "E-posta Bildirimleri",
-                                        isOn: $emailNotifications
-                                    )
-                                    
-                                    ToggleSettingsRow(
-                                        icon: "iphone",
-                                        title: "Push Bildirimleri",
-                                        isOn: $pushNotifications
-                                    )
-                                }
-                                
                                 // Kulüp Ayarları
                                 SettingsSection(title: "Kulüp Ayarları") {
                                     ToggleSettingsRow(
@@ -582,8 +611,19 @@ struct ProfileView: View {
                                         .padding()
                                     }
                                     
-                                    SettingsRow(icon: "questionmark.circle.fill", title: "Yardım ve Destek") {
-                                        // TODO: Yardım sayfası
+                                    NavigationLink(destination: HelpAndSupportView()) {
+                                        HStack {
+                                            Image(systemName: "questionmark.circle.fill")
+                                                .foregroundColor(theme.primaryColor)
+                                                .frame(width: 30)
+                                            Text("Yardım ve Destek")
+                                                .foregroundColor(theme.textColor)
+                                            Spacer()
+                                            Image(systemName: "chevron.right")
+                                                .foregroundColor(theme.secondaryTextColor)
+                                                .font(.caption)
+                                        }
+                                        .padding()
                                     }
                                 }
                                 
@@ -1001,7 +1041,8 @@ struct ProfileView: View {
                         id: doc.documentID,
                         title: data["title"] as? String ?? "",
                         description: data["description"] as? String ?? "",
-                        date: (data["startDate"] as? Timestamp)?.dateValue() ?? Date(),
+                        startDate: (data["startDate"] as? Timestamp)?.dateValue() ?? Date(),
+                        endDate: (data["endDate"] as? Timestamp)?.dateValue() ?? Date(),
                         location: data["location"] as? String ?? "",
                         clubId: data["clubId"] as? String ?? "",
                         imageURL: data["imageURL"] as? String ?? "",
@@ -1053,6 +1094,66 @@ struct ProfileView: View {
                         print("UserSession güncellendi!")
                     }
                 }
+            }
+        }
+    }
+    
+    private func loadPendingInvitations() {
+        guard let userId = userSession.currentUser?.id else { return }
+        let db = Firestore.firestore()
+        
+        db.collection("clubInvitations")
+            .whereField("receiverId", isEqualTo: userId)
+            .whereField("status", isEqualTo: "pending")
+            .getDocuments { snapshot, error in
+                if let documents = snapshot?.documents {
+                    pendingInvitations = documents.compactMap { doc in
+                        let data = doc.data()
+                        return ClubInvitation(
+                            id: doc.documentID,
+                            clubId: data["clubId"] as? String ?? "",
+                            clubName: data["clubName"] as? String ?? "",
+                            senderId: data["senderId"] as? String ?? "",
+                            senderName: data["senderName"] as? String ?? "",
+                            receiverId: data["receiverId"] as? String ?? "",
+                            status: .pending,
+                            createdAt: (data["createdAt"] as? Timestamp)?.dateValue() ?? Date()
+                        )
+                    }
+                }
+            }
+    }
+    
+    private func acceptInvitation(_ invitation: ClubInvitation) {
+        let db = Firestore.firestore()
+        
+        // Davet durumunu güncelle
+        db.collection("clubInvitations").document(invitation.id).updateData([
+            "status": "accepted"
+        ]) { error in
+            if error == nil {
+                // Kullanıcıyı kulübe ekle
+                userSession.joinClub(invitation.clubId)
+                
+                // Daveti listeden kaldır
+                pendingInvitations.removeAll { $0.id == invitation.id }
+                
+                // Kulüp listesini yenile
+                loadUserClubs()
+            }
+        }
+    }
+    
+    private func rejectInvitation(_ invitation: ClubInvitation) {
+        let db = Firestore.firestore()
+        
+        // Davet durumunu güncelle
+        db.collection("clubInvitations").document(invitation.id).updateData([
+            "status": "rejected"
+        ]) { error in
+            if error == nil {
+                // Daveti listeden kaldır
+                pendingInvitations.removeAll { $0.id == invitation.id }
             }
         }
     }
@@ -1241,5 +1342,40 @@ struct AdminActionButton: View {
             .cornerRadius(15)
             .shadow(radius: 5)
         }
+    }
+}
+
+// 1. Yardım ve Destek için yeni bir View ekle
+struct HelpAndSupportView: View {
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                Text("Yardım ve Destek")
+                    .font(.largeTitle)
+                    .fontWeight(.bold)
+                    .padding(.bottom, 10)
+                Group {
+                    Text("Uygulama Kullanımı")
+                        .font(.title2)
+                        .fontWeight(.semibold)
+                    Text("• Ana sayfadan güncel etkinlikleri ve kulüpleri görebilirsiniz.\n• Kulüplere katılmak için ilgili kulüp sayfasından 'Katıl' butonuna tıklayın.\n• Etkinliklere katılmak için etkinlik detayına girip 'Etkinliğe Katıl' butonunu kullanın.\n• Profil sayfanızdan katıldığınız kulüpleri ve etkinlikleri takip edebilirsiniz.")
+                }
+                Group {
+                    Text("Sıkça Sorulan Sorular")
+                        .font(.title2)
+                        .fontWeight(.semibold)
+                    Text("S: Kulübe nasıl katılırım?\nC: Kulüp detay sayfasında 'Katıl' butonuna tıklayarak katılabilirsiniz.\n\nS: Etkinliklere nasıl kayıt olurum?\nC: Etkinlik detayında 'Etkinliğe Katıl' butonunu kullanabilirsiniz.\n\nS: Şifremi unuttum, ne yapmalıyım?\nC: Giriş ekranında 'Şifremi Unuttum' seçeneğini kullanabilirsiniz.")
+                }
+                Group {
+                    Text("İletişim Bilgileri")
+                        .font(.title2)
+                        .fontWeight(.semibold)
+                    Text("Her türlü soru ve destek için bize ulaşabilirsiniz:\nE-posta: destek@vibecom.com\nInstagram: @vibecomapp\nWeb: www.vibecom.com")
+                }
+                Spacer()
+            }
+            .padding()
+        }
+        .navigationTitle("Yardım ve Destek")
     }
 } 

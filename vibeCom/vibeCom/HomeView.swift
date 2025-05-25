@@ -46,17 +46,8 @@ struct HomeView: View {
             
             ProfileView()
                 .tabItem {
-                    if let user = userSession.currentUser {
-                        VStack {
-                            TabBarProfileImageView(url: user.photoURL, size: 28, id: user.photoURL)
-                            Text("Profil")
-                        }
-                    } else {
-                        VStack {
-                            Image(systemName: "person")
-                            Text("Profil")
-                        }
-                    }
+                    Image(systemName: "person.crop.circle")
+                    Text("Profil")
                 }
         }
         .id(userSession.currentUser?.photoURL ?? "default")
@@ -146,7 +137,6 @@ struct MainView: View {
     
     private func loadData() {
         let db: Firestore = Firestore.firestore()
-        // Etkinlikler
         db.collection("events").getDocuments { snapshot, error in
             DispatchQueue.main.async {
                 if let documents = snapshot?.documents {
@@ -158,7 +148,8 @@ struct MainView: View {
                             id: doc.documentID,
                             title: data["title"] as? String ?? "",
                             description: data["description"] as? String ?? "",
-                            date: (data["startDate"] as? Timestamp)?.dateValue() ?? Date(),
+                            startDate: (data["startDate"] as? Timestamp)?.dateValue() ?? Date(),
+                            endDate: (data["endDate"] as? Timestamp)?.dateValue() ?? Date(),
                             location: data["location"] as? String ?? "",
                             clubId: data["clubId"] as? String ?? "",
                             imageURL: data["imageURL"] as? String ?? "",
@@ -166,11 +157,9 @@ struct MainView: View {
                             category: category
                         )
                     }
-                    // Öne çıkanlar: en yeni 3 etkinlik
                     featuredEvents = Array(allEvents.prefix(3))
-                    // Yaklaşanlar: bugünden sonraki etkinlikler
                     let now = Date()
-                    upcomingEvents = allEvents.filter { $0.date > now }.sorted { $0.date < $1.date }.prefix(5).map { $0 }
+                    upcomingEvents = allEvents.filter { $0.startDate > now }.sorted { $0.startDate < $1.startDate }.prefix(5).map { $0 }
                 } else {
                     featuredEvents = []
                     upcomingEvents = []
@@ -421,7 +410,7 @@ struct FeaturedEventCard: View {
             Text(event.title)
                 .font(.headline)
                 .foregroundColor(theme.textColor)
-            Text(event.date.formatted(date: .abbreviated, time: .shortened))
+            Text(event.startDate.formatted(date: .abbreviated, time: .shortened))
                 .font(.subheadline)
                 .foregroundColor(theme.secondaryTextColor)
         }
@@ -522,7 +511,7 @@ struct UpcomingEventCard: View {
                 Text(event.title)
                     .font(.headline)
                     .foregroundColor(theme.textColor)
-                Text("\(event.date.formatted(date: .abbreviated, time: .shortened))")
+                Text(event.startDate.formatted(date: .abbreviated, time: .shortened))
                     .font(.subheadline)
                     .foregroundColor(theme.secondaryTextColor)
                 Text(event.location)
@@ -595,32 +584,37 @@ struct ClubManagerSelectorView: View {
     }
 }
 
-// TabBar'da profil fotoğrafı göstermek için küçük bir view
-struct TabBarProfileImageView: View {
-    let url: String
-    let size: CGFloat
-    let id: String
+// Tab bar için özel bir SwiftUI view
+struct TabBarProfileImageTabItem: View {
+    let photoURL: String?
+    @State private var uiImage: UIImage? = nil
+    let size: CGFloat = 28
 
     var body: some View {
-        if let imageURL = URL(string: url), !url.isEmpty {
-            AsyncImage(url: imageURL) { image in
-                image.resizable()
-            } placeholder: {
-                Image(systemName: "person.crop.circle.fill")
+        Group {
+            if let uiImage = uiImage {
+                CircularTabBarProfileImageView(image: uiImage, size: size)
+                    .frame(width: size, height: size)
+            } else {
+                Image(systemName: "person.crop.circle")
                     .resizable()
-                    .foregroundColor(.gray)
+                    .frame(width: size, height: size)
+                    .clipShape(Circle())
             }
-            .aspectRatio(contentMode: .fill)
-            .frame(width: size, height: size)
-            .clipShape(Circle())
-            .id(id)
-        } else {
-            Image(systemName: "person.crop.circle.fill")
-                .resizable()
-                .foregroundColor(.gray)
-                .frame(width: size, height: size)
-                .clipShape(Circle())
-                .id(id)
+        }
+        .onAppear {
+            loadImage()
+        }
+    }
+
+    private func loadImage() {
+        guard let urlString = photoURL, let url = URL(string: urlString), uiImage == nil else { return }
+        DispatchQueue.global().async {
+            if let data = try? Data(contentsOf: url), let image = UIImage(data: data) {
+                DispatchQueue.main.async {
+                    self.uiImage = image
+                }
+            }
         }
     }
 }

@@ -398,6 +398,7 @@ struct ClubDetailView: View {
     @State private var isAnimating = false
     @ObservedObject private var userSession = UserSession.shared
     @State private var clubEvents: [Event] = []
+    @State private var clubMembers: [AppUser] = []
     
     var body: some View {
         ScrollView {
@@ -514,7 +515,7 @@ struct ClubDetailView: View {
                                             Text(event.title)
                                                 .font(.headline)
                                         .foregroundColor(theme.textColor)
-                                            Text(event.date, style: .date)
+                                            Text(event.startDate, style: .date)
                                                 .font(.caption)
                                                 .foregroundColor(theme.secondaryTextColor)
                                         }
@@ -579,13 +580,13 @@ struct ClubDetailView: View {
                 isAnimating = true
             }
             loadClubEvents()
+            loadClubMembers()
         }
     }
     
     private func loadClubEvents() {
         let db = Firestore.firestore()
         let eventIds = club.events
-        
         for eventId in eventIds {
             db.collection("events").document(eventId).getDocument { snapshot, error in
                 if let data = snapshot?.data() {
@@ -595,7 +596,8 @@ struct ClubDetailView: View {
                         id: eventId,
                         title: data["title"] as? String ?? "",
                         description: data["description"] as? String ?? "",
-                        date: (data["startDate"] as? Timestamp)?.dateValue() ?? Date(),
+                        startDate: (data["startDate"] as? Timestamp)?.dateValue() ?? Date(),
+                        endDate: (data["endDate"] as? Timestamp)?.dateValue() ?? Date(),
                         location: data["location"] as? String ?? "",
                         clubId: data["clubId"] as? String ?? "",
                         imageURL: data["imageURL"] as? String ?? "",
@@ -619,6 +621,33 @@ struct ClubDetailView: View {
         case "facebook": return "person.2"
         case "linkedin": return "network"
         default: return "link"
+        }
+    }
+    
+    private func loadClubMembers() {
+        let db = Firestore.firestore()
+        let memberIds = club.members
+        guard !memberIds.isEmpty else {
+            clubMembers = []
+            return
+        }
+        db.collection("users").getDocuments { snapshot, error in
+            if let documents = snapshot?.documents {
+                clubMembers = documents.compactMap { doc in
+                    guard memberIds.contains(doc.documentID) else { return nil }
+                    let data = doc.data()
+                    return AppUser(
+                        id: doc.documentID,
+                        displayName: data["displayName"] as? String ?? "",
+                        email: data["email"] as? String ?? "",
+                        photoURL: data["photoURL"] as? String ?? "",
+                        role: data["role"] as? String ?? "user",
+                        clubIds: data["clubIds"] as? [String] ?? [],
+                        createdAt: (data["createdAt"] as? Timestamp)?.dateValue(),
+                        updatedAt: (data["updatedAt"] as? Timestamp)?.dateValue()
+                    )
+                }
+            }
         }
     }
 }
@@ -665,108 +694,6 @@ struct ClubDetailView_Previews: PreviewProvider {
                 leaderID: "leader1",
                 isActive: true
             ))
-        }
-    }
-}
-
-struct ClubManagementView: View {
-    @State private var club: Club
-    @State private var showingEventCreation = false
-    @State private var showingClubEdit = false
-    @State private var newEventName = ""
-    @State private var newEventDescription = ""
-    @State private var newEventDate = Date()
-    @State private var showingDeleteAlert = false
-    @State private var isDeleting = false
-    
-    init(club: Club) {
-        _club = State(initialValue: club)
-    }
-    
-    var body: some View {
-        NavigationView {
-            List {
-                Section(header: Text("Kulüp Bilgileri")) {
-                    HStack {
-                        Text("Kulüp Adı:")
-                        Spacer()
-                        Text(club.name)
-                    }
-                    
-                    HStack {
-                        Text("Açıklama:")
-                        Spacer()
-                        Text(club.description)
-                    }
-                    
-                    Button(action: {
-                        showingClubEdit = true
-                    }) {
-                        Text("Kulüp Bilgilerini Düzenle")
-                            .foregroundColor(.blue)
-                    }
-                    // Kulübü Dağıt butonu (sadece başkan görür)
-                    if UserSession.shared.currentUser?.id == club.leaderID {
-                        Button(role: .destructive, action: {
-                            showingDeleteAlert = true
-                        }) {
-                            Text("Kulübü Dağıt")
-                                .foregroundColor(.red)
-                        }
-                        .disabled(isDeleting)
-                    }
-                }
-                
-                Section(header: Text("Etkinlikler")) {
-                    ForEach(club.events, id: \.self) { eventId in
-                        // Burada Event modelini kullanarak etkinlik detaylarını gösterebiliriz
-                        Text(eventId)
-                    }
-                    
-                    Button(action: {
-                        showingEventCreation = true
-                    }) {
-                        Text("Yeni Etkinlik Ekle")
-                            .foregroundColor(.blue)
-                    }
-                }
-            }
-            .navigationTitle("Kulüp Yönetimi")
-            .sheet(isPresented: $showingEventCreation) {
-                EventCreationView(club: club)
-            }
-            .sheet(isPresented: $showingClubEdit) {
-                ClubEditView(club: club)
-            }
-            .alert("Kulübü silmek istediğinizden emin misiniz?", isPresented: $showingDeleteAlert) {
-                Button("İptal", role: .cancel) {}
-                Button("Evet, Sil", role: .destructive) {
-                    deleteClubAndEvents(club: club)
-                }
-            } message: {
-                Text("Bu işlem geri alınamaz. Kulüp ve tüm etkinlikleri silinecek.")
-            }
-        }
-    }
-    
-    private func deleteClubAndEvents(club: Club) {
-        isDeleting = true
-        let db: Firestore = Firestore.firestore()
-        // Önce kulübe ait etkinlikleri sil
-        let eventIds: [String] = club.events
-        let group = DispatchGroup()
-        for eventId in eventIds {
-            group.enter()
-            db.collection("events").document(eventId).delete { _ in
-                group.leave()
-            }
-        }
-        group.notify(queue: .main) {
-            // Sonra kulübü sil
-            db.collection("clubs").document(club.id).delete { _ in
-                isDeleting = false
-                // İsteğe bağlı: Kullanıcıyı ana ekrana yönlendir
-            }
         }
     }
 }
@@ -854,4 +781,66 @@ struct ClubEditView: View {
             })
         }
     }
-} 
+}
+
+struct UserInviteListView: View {
+    let club: Club
+    let users: [AppUser]
+    let onInvite: (AppUser) -> Void
+    @Environment(\.presentationMode) var presentationMode
+    @State private var searchText = ""
+    
+    var filteredUsers: [AppUser] {
+        if searchText.isEmpty {
+            return users.filter { !club.members.contains($0.id) }
+        } else {
+            return users.filter { user in
+                !club.members.contains(user.id) &&
+                (user.displayName.localizedCaseInsensitiveContains(searchText) ||
+                 user.email.localizedCaseInsensitiveContains(searchText))
+            }
+        }
+    }
+    
+    var body: some View {
+        NavigationView {
+            List {
+                ForEach(filteredUsers) { user in
+                    HStack {
+                        AsyncImage(url: URL(string: user.photoURL)) { image in
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                        } placeholder: {
+                            Image(systemName: "person.circle.fill")
+                                .foregroundColor(.gray)
+                        }
+                        .frame(width: 40, height: 40)
+                        .clipShape(Circle())
+                        
+                        VStack(alignment: .leading) {
+                            Text(user.displayName)
+                                .font(.headline)
+                            Text(user.email)
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                        }
+                        
+                        Spacer()
+                        
+                        Button("Davet Et") {
+                            onInvite(user)
+                            presentationMode.wrappedValue.dismiss()
+                        }
+                        .foregroundColor(.blue)
+                    }
+                }
+            }
+            .searchable(text: $searchText, prompt: "Kullanıcı Ara")
+            .navigationTitle("Kullanıcıları Davet Et")
+            .navigationBarItems(trailing: Button("Kapat") {
+                presentationMode.wrappedValue.dismiss()
+            })
+        }
+    }
+}

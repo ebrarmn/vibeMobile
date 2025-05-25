@@ -197,12 +197,12 @@ struct EventsView: View {
     
     private var upcomingEvents: [Event] {
         let now = Date()
-        return filteredEvents.filter { $0.date >= now }.sorted { $0.date < $1.date }
+        return filteredEvents.filter { $0.startDate >= now }.sorted { $0.startDate < $1.startDate }
     }
     
     private var pastEvents: [Event] {
         let now = Date()
-        return filteredEvents.filter { $0.date < now }.sorted { $0.date > $1.date }
+        return filteredEvents.filter { $0.endDate < now }.sorted { $0.endDate > $1.endDate }
     }
     
     private func loadEvents() async {
@@ -222,14 +222,14 @@ struct EventsView: View {
                 }
                 events = documents.compactMap { doc in
                     let data = doc.data()
-                    // Kategori string'den enum'a dönüştürülüyor
                     let categoryRaw = data["category"] as? String ?? "all"
                     let category = EventCategory(rawValue: categoryRaw) ?? .all
                     return Event(
                         id: doc.documentID,
                         title: data["title"] as? String ?? "",
                         description: data["description"] as? String ?? "",
-                        date: (data["startDate"] as? Timestamp)?.dateValue() ?? Date(),
+                        startDate: (data["startDate"] as? Timestamp)?.dateValue() ?? Date(),
+                        endDate: (data["endDate"] as? Timestamp)?.dateValue() ?? Date(),
                         location: data["location"] as? String ?? "",
                         clubId: data["clubId"] as? String ?? "",
                         imageURL: data["imageURL"] as? String ?? "",
@@ -330,7 +330,7 @@ struct EventDetailView: View {
         userSession.joinedClubs.contains(event.clubId)
     }
     private var isEventPast: Bool {
-        event.date < Date()
+        event.endDate < Date()
     }
     
     var body: some View {
@@ -375,7 +375,7 @@ struct EventDetailView: View {
                         HStack {
                             Image(systemName: "calendar")
                                 .foregroundColor(theme.primaryColor)
-                            Text(event.date.formatted(date: .long, time: .shortened))
+                            Text(event.startDate.formatted(date: .long, time: .shortened))
                             Spacer()
                         }
                         
@@ -507,7 +507,7 @@ struct FeaturedEventView: View {
                     .foregroundColor(.secondary)
                     .lineLimit(2)
                 HStack {
-                    Label(event.date.formatted(date: .abbreviated, time: .shortened),
+                    Label(event.startDate.formatted(date: .abbreviated, time: .shortened),
                           systemImage: "calendar")
                     Spacer()
                     Label(event.location, systemImage: "mappin.and.ellipse")
@@ -551,7 +551,7 @@ struct WeeklyEventCard: View {
                 Text("Düzenleyen: \(clubName)")
                     .font(.caption2)
                     .foregroundColor(.secondary)
-            Text(event.date.formatted(date: .abbreviated, time: .shortened))
+            Text(event.startDate.formatted(date: .abbreviated, time: .shortened))
                 .font(.caption)
                 .foregroundColor(.secondary)
                     Text(event.location)
@@ -600,7 +600,7 @@ struct EventCard: View {
                     .foregroundColor(.secondary)
                     .lineLimit(2)
                 HStack {
-                    Label(event.date.formatted(date: .abbreviated, time: .shortened),
+                    Label(event.startDate.formatted(date: .abbreviated, time: .shortened),
                           systemImage: "calendar")
                     Spacer()
                     Label("\(event.attendees.count)", systemImage: "person.2")

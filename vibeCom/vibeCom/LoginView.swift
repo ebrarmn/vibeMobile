@@ -265,7 +265,7 @@ struct LoginTextField: View {
     @Binding var text: String
     let icon: String
     var isSecure: Bool = false
-    
+    var keyboardType: UIKeyboardType = .default
     @State private var isPasswordVisible: Bool = false
     
     var body: some View {
@@ -281,10 +281,12 @@ struct LoginTextField: View {
                         Group {
                             if isPasswordVisible {
                                 TextField(placeholder, text: $text)
+                                    .keyboardType(keyboardType)
                                     .autocapitalization(.none)
                                     .disableAutocorrection(true)
                             } else {
                                 SecureField(placeholder, text: $text)
+                                    .keyboardType(keyboardType)
                             }
                         }
                         .foregroundColor(.primary)
@@ -298,7 +300,7 @@ struct LoginTextField: View {
                     }
                 } else {
                     TextField(placeholder, text: $text)
-                        .keyboardType(title.lowercased().contains("mail") ? .emailAddress : .default)
+                        .keyboardType(keyboardType)
                         .autocapitalization(.none)
                         .disableAutocorrection(title.lowercased().contains("mail"))
                         .foregroundColor(.primary)
